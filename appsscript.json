@@ -1,0 +1,49 @@
+{
+  "timeZone": "Asia/Taipei",
+  "dependencies": {
+  },
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "sheets": {
+    "macros": [{
+      "menuName": "排序",
+      "functionName": "myFunction"
+    }, {
+      "menuName": "autofitwidth",
+      "functionName": "autofitwidth"
+    }, {
+      "menuName": "未命名巨集",
+      "functionName": "myFunction"
+    }, {
+      "menuName": "未命名巨集",
+      "functionName": "myFunction"
+    }, {
+      "menuName": "ewe",
+      "functionName": "ewe"
+    }, {
+      "menuName": "美化",
+      "functionName": "myFunction"
+    }, {
+      "menuName": "未命名巨集",
+      "functionName": "myFunction"
+    }, {
+      "menuName": "未命名巨集",
+      "functionName": "myFunction"
+    }, {
+      "menuName": "未命名巨集",
+      "functionName": "myFunction"
+    }, {
+      "menuName": "未命名巨集",
+      "functionName": "myFunction"
+    }, {
+      "menuName": "未命名巨集 1",
+      "functionName": "myFunction1"
+    }, {
+      "menuName": "未命名巨集",
+      "functionName": "myFunction"
+    }, {
+      "menuName": "未命名巨集",
+      "functionName": "myFunction"
+    }]
+  }
+}
