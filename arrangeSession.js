@@ -1,11 +1,11 @@
-function arrange_commons_session(){
+function arrangeCommonsSession(){
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const parameters_sheet = ss.getSheetByName("參數區");
-  const [param_headers,...commonData] = parameters_sheet.getRange(2, 5, 21, 2).getValues();
-  const filtered_sheet = ss.getSheetByName("排入考程的補考名單");
-  const [headers, ...data] = filtered_sheet.getDataRange().getValues();
-  const subject_column = headers.indexOf("科目名稱");
-  const session_column = headers.indexOf("節次");
+  const parametersSheet = ss.getSheetByName("參數區");
+  const [paramHeaders,...commonData] = parametersSheet.getRange(2, 5, 21, 2).getValues();
+  const filteredSheet = ss.getSheetByName("排入考程的補考名單");
+  const [headers, ...data] = filteredSheet.getDataRange().getValues();
+  const subjectColumn = headers.indexOf("科目名稱");
+  const sessionColumn = headers.indexOf("節次");
 
   let commonSessions = {}
   commonData.forEach(
@@ -14,19 +14,19 @@ function arrange_commons_session(){
     }
   );
   
-  let modified_data = data.map(
+  let modifiedData = data.map(
     function(row){
-      if(commonSessions[row[subject_column]] == null){
+      if(commonSessions[row[subjectColumn]] == null){
         return row;
       } else {
-        row[session_column] = commonSessions[row[subject_column]];
+        row[sessionColumn] = commonSessions[row[subjectColumn]];
         return row; 
       } 
     }
   );
 
-  if(modified_data.length == data.length){
-    set_range_values(filtered_sheet.getRange(2, 1, modified_data.length, modified_data[0].length), modified_data);
+  if(modifiedData.length == data.length){
+    setRangeValues(filteredSheet.getRange(2, 1, modifiedData.length, modifiedData[0].length), modifiedData);
   } else {
     Logger.log("安排共同科目節次時，合併後的資料筆數和原有的筆數不同！");
     SpreadsheetApp.getUi().alert("安排共同科目節次時，合併後的資料筆數和原有的筆數不同！");
@@ -34,7 +34,7 @@ function arrange_commons_session(){
 }
 
 
-function descending_sorting(a, b) {
+function descendingSorting(a, b) {
     if (a[1] === b[1]) {
         return 0;
     }
@@ -47,27 +47,27 @@ function descending_sorting(a, b) {
 function arrangeProfessionsSession(){
   // 安排非共同科目的節次
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const filtered_sheet = ss.getSheetByName("排入考程的補考名單");
-  const [headers, ...data] = filtered_sheet.getDataRange().getValues();
-  const session_column = headers.indexOf("節次");
+  const filteredSheet = ss.getSheetByName("排入考程的補考名單");
+  const [headers, ...data] = filteredSheet.getDataRange().getValues();
+  const sessionColumn = headers.indexOf("節次");
 
   const parametersSheet = ss.getSheetByName("參數區");
   const MAX_SESSION_NUMBER = parametersSheet.getRange("B5").getValue();
   const MAX_SESSION_STUDENTS = 0.9 * parametersSheet.getRange("B9").getValue();  // 每節的最大學生數的 9 成
 
-  const dgs = Object.entries(get_department_grade_subject_statistics()).sort(descending_sorting);
-  const sessions = get_session_statistics();
+  const dgs = Object.entries(getDepartmentGradeSubjectStatistics()).sort(descendingSorting);
+  const sessions = getSessionStatistics();
   
   for(let i=1; i < MAX_SESSION_NUMBER + 2; i++){
     for(let k=0; k < dgs.length; k++){
-      const department_grade = dgs[k][0].slice(0, dgs[k][0].indexOf("_"));
-      const has_duplicate = Object.keys(sessions[i].department_grade_statisics).includes(department_grade);
-      if(has_duplicate){
+      const departmentGrade = dgs[k][0].slice(0, dgs[k][0].indexOf("_"));
+      const hasDuplicate = Object.keys(sessions[i].departmentGradeStatistics).includes(departmentGrade);
+      if(hasDuplicate){
         continue;
       }
 
-      const has_quota = dgs[k][1] + sessions[i].population <= MAX_SESSION_STUDENTS;
-      if(!has_quota){
+      const hasQuota = dgs[k][1] + sessions[i].population <= MAX_SESSION_STUDENTS;
+      if(!hasQuota){
         continue;
       }
 
@@ -77,12 +77,12 @@ function arrangeProfessionsSession(){
         break;
       }
 
-      if(!has_duplicate && has_quota){
+      if(!hasDuplicate && hasQuota){
         data.forEach(
           function(row){
             let key=row[0] + row[1] + "_" + row[7];
             if(key == dgs[k][0] && row[8] == 0){
-              row[session_column] = i;
+              row[sessionColumn] = i;
               sessions[i].students.push(row);
             }
           }
@@ -91,14 +91,14 @@ function arrangeProfessionsSession(){
     }
   }
 
-  let modified_data = [];
+  let modifiedData = [];
   for(let i=1; i < MAX_SESSION_NUMBER + 2; i++){
     Logger.log("sessions[" + i + "]: " + sessions[i].population);
-    modified_data = modified_data.concat(sessions[i].students);
+    modifiedData = modifiedData.concat(sessions[i].students);
   }
     
-  if(modified_data.length == data.length){
-    set_range_values(filtered_sheet.getRange(2, 1, modified_data.length, modified_data[0].length), modified_data);
+  if(modifiedData.length == data.length){
+    setRangeValues(filteredSheet.getRange(2, 1, modifiedData.length, modifiedData[0].length), modifiedData);
   } else {
     Logger.log("無法將所有人排入 " + MAX_SESSION_NUMBER + " 節，請檢查是否有某科年級須補考 " + parseInt(MAX_SESSION_NUMBER + 1) +" 科以上！");
     SpreadsheetApp.getUi().alert("無法將所有人排入 " + MAX_SESSION_NUMBER + "節，請檢查是否有某科年級須補考 10 科以上！");
