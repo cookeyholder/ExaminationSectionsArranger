@@ -1,290 +1,282 @@
-function mergeToSmallBag(){
-  // 先產生合併列印小袋用的資料
-  generateSmallBagData();
+function mergeSmallBagPdfFiles(){
+  composeSmallBagDataset();
 
-  const runtimeCountStart = new Date();
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const parametersSheet = ss.getSheetByName("參數區");
-  const smallBagSheet = ss.getSheetByName("小袋封面套印用資料");
-  const [headers,...data] = smallBagSheet.getDataRange().getValues();
-  const schoolYear = parametersSheet.getRange("B2").getValue();
-  const semester = parametersSheet.getRange("B3").getValue();
-  const folderId = parametersSheet.getRange("B10").getValue();
-  const smallTemplateId = parametersSheet.getRange("B12").getValue();
-  const smallTemplate = DriveApp.getFileById(smallTemplateId);
-  const makeUpDate = parametersSheet.getRange("B13").getValue();
-  const folder = DriveApp.getFolderById(folderId);
+  const runtimeStart = new Date();
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  const parameterSheet = spreadsheet.getSheetByName("參數區");
+  const smallBagSheet = spreadsheet.getSheetByName("小袋封面套印用資料");
+  const [headerRow, ...smallBagRows] = smallBagSheet.getDataRange().getValues();
+  const schoolYearValue = parameterSheet.getRange("B2").getValue();
+  const semesterValue = parameterSheet.getRange("B3").getValue();
+  const destinationFolderId = parameterSheet.getRange("B10").getValue();
+  const templateId = parameterSheet.getRange("B12").getValue();
+  const templateFile = DriveApp.getFileById(templateId);
+  const examDateValue = parameterSheet.getRange("B13").getValue();
+  const destinationFolder = DriveApp.getFolderById(destinationFolderId);
 
-  // 學年度	學期	小袋序號	節次	時間	試場	班級	科目名稱	任課老師	小袋人數	電腦	人工
-  const schoolYearColumn = headers.indexOf("學年度");
-  const semesterColumn = headers.indexOf("學期");
-  const smallBagSerialColumn = headers.indexOf("小袋序號");
-  const sessionColumn = headers.indexOf("節次");
-  const timeColumn = headers.indexOf("時間");
-  const classroomColumn = headers.indexOf("試場");
-  const classColumn = headers.indexOf("班級");
-  const subjectNameColumn = headers.indexOf("科目名稱");
-  const teacherColumn = headers.indexOf("任課老師");
-  const smallBagPopulationColumn = headers.indexOf("小袋人數");
-  const byComputerColumn = headers.indexOf("電腦");
-  const byHandColumn = headers.indexOf("人工");
+  const schoolYearIndex = headerRow.indexOf("學年度");
+  const semesterIndex = headerRow.indexOf("學期");
+  const smallBagIndex = headerRow.indexOf("小袋序號");
+  const sessionIndex = headerRow.indexOf("節次");
+  const timeIndex = headerRow.indexOf("時間");
+  const roomIndex = headerRow.indexOf("試場");
+  const classIndex = headerRow.indexOf("班級");
+  const subjectIndex = headerRow.indexOf("科目名稱");
+  const teacherIndex = headerRow.indexOf("任課老師");
+  const smallBagPopulationIndex = headerRow.indexOf("小袋人數");
+  const computerIndex = headerRow.indexOf("電腦");
+  const manualIndex = headerRow.indexOf("人工");
 
-  const BATCH_SIZE = 50;  // 每個 PDF 檔的頁數，太大或太小的數字都會減慢整體速度
-  const numberOfDigits = data.length.toString().length;
+  const batchSize = 50;
+  const digitCount = smallBagRows.length.toString().length;
 
-  let mergedFilename = schoolYear + "學年度第" + semester + "學期補考小袋封面";
-  let mergedFile = smallTemplate.makeCopy(mergedFilename, folder);
-  let mergedDoc = DocumentApp.openById(mergedFile.getId()).setMarginTop(0).setMarginBottom(0);
-  let body = mergedDoc.getBody();
-  body.removeChild(body.getTables()[0]);
+  let mergedFileName = schoolYearValue + "學年度第" + semesterValue + "學期補考小袋封面";
+  let mergedDocFile = templateFile.makeCopy(mergedFileName, destinationFolder);
+  let mergedDocument = DocumentApp.openById(mergedDocFile.getId()).setMarginTop(0).setMarginBottom(0);
+  let mergedBody = mergedDocument.getBody();
+  mergedBody.removeChild(mergedBody.getTables()[0]);
 
-  let tmpDoc = DocumentApp.openById(smallTemplate.makeCopy("暫時的小袋" , folder).getId());
-  let tmpBody = tmpDoc.getBody();
-  let tmpBodyClone = tmpBody.copy();
+  let temporaryDocument = DocumentApp.openById(templateFile.makeCopy("暫時的小袋" , destinationFolder).getId());
+  let temporaryBody = temporaryDocument.getBody();
+  let temporaryBodyClone = temporaryBody.copy();
 
-  for (let i=0; i < data.length; i++){
-    tmpBodyClone.replaceText("«學年度»" ,data[i][schoolYearColumn]);
-    tmpBodyClone.replaceText("«學期»" ,data[i][semesterColumn]);
-    tmpBodyClone.replaceText("«補考日期»", makeUpDate);
-    tmpBodyClone.replaceText("«小袋序號»" ,data[i][smallBagSerialColumn]);
-    tmpBodyClone.replaceText("«節次»" ,data[i][sessionColumn]);
-    tmpBodyClone.replaceText("«時間»" ,data[i][timeColumn]);
-    tmpBodyClone.replaceText("«試場»" ,data[i][classroomColumn]);
-    tmpBodyClone.replaceText("«班級»" ,data[i][classColumn]);
-    tmpBodyClone.replaceText("«科目名稱»" ,data[i][subjectNameColumn]);
-    tmpBodyClone.replaceText("«任課老師»" ,data[i][teacherColumn]);
-    tmpBodyClone.replaceText("«班級人數»" ,data[i][smallBagPopulationColumn]);
-    tmpBodyClone.replaceText("«電腦»" ,data[i][byComputerColumn]);
-    tmpBodyClone.replaceText("«人工»" ,data[i][byHandColumn]);
+  for (let rowIndex = 0; rowIndex < smallBagRows.length; rowIndex++){
+    temporaryBodyClone.replaceText("«學年度»" ,smallBagRows[rowIndex][schoolYearIndex]);
+    temporaryBodyClone.replaceText("«學期»" ,smallBagRows[rowIndex][semesterIndex]);
+    temporaryBodyClone.replaceText("«補考日期»", examDateValue);
+    temporaryBodyClone.replaceText("«小袋序號»" ,smallBagRows[rowIndex][smallBagIndex]);
+    temporaryBodyClone.replaceText("«節次»" ,smallBagRows[rowIndex][sessionIndex]);
+    temporaryBodyClone.replaceText("«時間»" ,smallBagRows[rowIndex][timeIndex]);
+    temporaryBodyClone.replaceText("«試場»" ,smallBagRows[rowIndex][roomIndex]);
+    temporaryBodyClone.replaceText("«班級»" ,smallBagRows[rowIndex][classIndex]);
+    temporaryBodyClone.replaceText("«科目名稱»" ,smallBagRows[rowIndex][subjectIndex]);
+    temporaryBodyClone.replaceText("«任課老師»" ,smallBagRows[rowIndex][teacherIndex]);
+    temporaryBodyClone.replaceText("«班級人數»" ,smallBagRows[rowIndex][smallBagPopulationIndex]);
+    temporaryBodyClone.replaceText("«電腦»" ,smallBagRows[rowIndex][computerIndex]);
+    temporaryBodyClone.replaceText("«人工»" ,smallBagRows[rowIndex][manualIndex]);
 
-    const tmpTable = tmpBodyClone.getTables()[0];
-    const studentsList = getStudents(data[i][smallBagSerialColumn]);
-    const studentsTable = tmpTable.getCell(1,0).setPaddingTop(0).setPaddingBottom(0).appendTable(studentsList);
+    const templateTable = temporaryBodyClone.getTables()[0];
+    const studentListing = buildSmallBagStudentTable(smallBagRows[rowIndex][smallBagIndex]);
+    const studentTable = templateTable.getCell(1,0).setPaddingTop(0).setPaddingBottom(0).appendTable(studentListing);
 
-    const style = {};
-    if (studentsList.length > 23){
-      style[DocumentApp.Attribute.FONT_SIZE] = 7;
-    } else {
-      style[DocumentApp.Attribute.FONT_SIZE] = 8;
-    }
-    studentsTable.setAttributes(style);
-    for (let j=0; j < studentsTable.getNumRows() ; j++){
-      for (let k=0; k < studentsTable.getRow(j).getNumCells(); k++){
+    const tableStyle = {};
+    tableStyle[DocumentApp.Attribute.FONT_SIZE] = studentListing.length > 23 ? 7 : 8;
+    studentTable.setAttributes(tableStyle);
+    for (let studentRowIndex = 0; studentRowIndex < studentTable.getNumRows() ; studentRowIndex++){
+      for (let studentCellIndex = 0; studentCellIndex < studentTable.getRow(studentRowIndex).getNumCells(); studentCellIndex++){
         const cellStyle = {};
         cellStyle[DocumentApp.Attribute.HORIZONTAL_ALIGNMENT] = DocumentApp.HorizontalAlignment.CENTER;
-        studentsTable.getRow(j).getCell(k)
+        studentTable.getRow(studentRowIndex).getCell(studentCellIndex)
           .setPaddingTop(0)
           .setPaddingBottom(0)
           .getChild(0).asParagraph().setAttributes(cellStyle);
 
-        switch (k){
-          case 0:  // 編號
-            studentsTable.getRow(j).getCell(k).setWidth(20);
+        switch (studentCellIndex){
+          case 0:
+            studentTable.getRow(studentRowIndex).getCell(studentCellIndex).setWidth(20);
             break;
-          case 1:  // 班級
-            studentsTable.getRow(j).getCell(k).setWidth(60);
+          case 1:
+          case 2:
+          case 3:
+            studentTable.getRow(studentRowIndex).getCell(studentCellIndex).setWidth(60);
             break;
-          case 2:  // 學號
-            studentsTable.getRow(j).getCell(k).setWidth(60);
-            break;
-          case 3:  // 姓名
-            studentsTable.getRow(j).getCell(k).setWidth(60);
-            break;
-          case 4:  // 科目名稱
-            studentsTable.getRow(j).getCell(k).setWidth(140);
+          case 4:
+            studentTable.getRow(studentRowIndex).getCell(studentCellIndex).setWidth(140);
             break;
         }
       }
     }
 
-    body.appendTable(tmpTable.copy());
-    if (i % BATCH_SIZE != BATCH_SIZE - 1){
-      body.appendPageBreak();
+    mergedBody.appendTable(templateTable.copy());
+    if (rowIndex % batchSize !== batchSize - 1){
+      mergedBody.appendPageBreak();
     }
-    tmpBodyClone = tmpBody.copy();
+    temporaryBodyClone = temporaryBody.copy();
     
-    if(i % BATCH_SIZE == BATCH_SIZE - 1){
-      // 設定字體後存檔
-      body.editAsText().setFontFamily("Noto Sans TC");
-      mergedDoc.saveAndClose();
+    if(rowIndex % batchSize === batchSize - 1){
+      mergedBody.editAsText().setFontFamily("Noto Sans TC");
+      mergedDocument.saveAndClose();
 
-      // 轉換成 PDF 檔，且在檔名加上小袋序號的範圍
-      const pdfBlob = mergedFile.getAs('application/pdf');
-      const pdfName = mergedFilename + "_" + ( 1 + BATCH_SIZE * Math.floor(i / BATCH_SIZE)).toLocaleString('en-US', {minimumIntegerDigits: numberOfDigits, useGrouping:false}) + "-" + (BATCH_SIZE * (1 + Math.floor(i / BATCH_SIZE))).toLocaleString('en-US', {minimumIntegerDigits: numberOfDigits, useGrouping:false})  + ".pdf";
+      const pdfBlob = mergedDocFile.getAs('application/pdf');
+      const pdfName =
+        mergedFileName + "_" +
+        ( 1 + batchSize * Math.floor(rowIndex / batchSize)).toLocaleString('en-US', {minimumIntegerDigits: digitCount, useGrouping:false}) +
+        "-" +
+        (batchSize * (1 + Math.floor(rowIndex / batchSize))).toLocaleString('en-US', {minimumIntegerDigits: digitCount, useGrouping:false}) +
+        ".pdf";
       const pdfFile = DriveApp.createFile(pdfBlob).setName(pdfName);
-      pdfFile.moveTo(folder);
+      pdfFile.moveTo(destinationFolder);
 
-      // 把舊的 mergedFile 移到垃圾桶後，再重新產生新的 mergedFile
-      mergedFile.setTrashed(true);
-      mergedFile = smallTemplate.makeCopy(mergedFilename, folder);
-      mergedDoc = DocumentApp.openById(mergedFile.getId());
-      body = mergedDoc.getBody();
-      body.removeChild(body.getTables()[0]);
+      mergedDocFile.setTrashed(true);
+      mergedDocFile = templateFile.makeCopy(mergedFileName, destinationFolder);
+      mergedDocument = DocumentApp.openById(mergedDocFile.getId()).setMarginTop(0).setMarginBottom(0);
+      mergedBody = mergedDocument.getBody();
+      mergedBody.removeChild(mergedBody.getTables()[0]);
     }
   }
 
-  // 將暫存檔移到垃圾桶
-  tmpDoc.saveAndClose();
-  DriveApp.getFileById(tmpDoc.getId()).setTrashed(true);
+  temporaryDocument.saveAndClose();
+  DriveApp.getFileById(temporaryDocument.getId()).setTrashed(true);
 
-  if (data.length % BATCH_SIZE != 0){
-    // 設定字體為 Noto Sans TC 後存檔
-    body.editAsText().setFontFamily("Noto Sans TC");
-    mergedDoc.saveAndClose();
+  if (smallBagRows.length % batchSize !== 0){
+    mergedBody.editAsText().setFontFamily("Noto Sans TC");
+    mergedDocument.saveAndClose();
 
-    // 把最後一批轉換成 PDF 檔
-    const pdfBlob = mergedFile.getAs('application/pdf');
-    const pdfName = mergedFilename + "_" + (BATCH_SIZE * Math.floor(data.length / BATCH_SIZE).toLocaleString('en-US', {minimumIntegerDigits: numberOfDigits, useGrouping:false}) + 1) + "-" + data.length + ".pdf";
+    const pdfBlob = mergedDocFile.getAs('application/pdf');
+    const pdfName =
+      mergedFileName + "_" +
+      (batchSize * Math.floor(smallBagRows.length / batchSize).toLocaleString('en-US', {minimumIntegerDigits: digitCount, useGrouping:false}) + 1) +
+      "-" +
+      smallBagRows.length +
+      ".pdf";
     const pdfFile = DriveApp.createFile(pdfBlob).setName(pdfName);
-    pdfFile.moveTo(folder);
+    pdfFile.moveTo(destinationFolder);
   }
-  mergedFile.setTrashed(true);
+  mergedDocFile.setTrashed(true);
 
-  const newRuntime = runtimeCountStop(runtimeCountStart);
-  SpreadsheetApp.getUi().alert("已完成小袋封面合併列印，共" + data.length + "頁，使用" + newRuntime + "秒。");
+  const elapsedSeconds = calculateElapsedSeconds(runtimeStart);
+  SpreadsheetApp.getUi().alert("已完成小袋封面合併列印，共" + smallBagRows.length + "頁，使用" + elapsedSeconds + "秒。");
 }
 
 
-function getStudents(smallBagSerial){
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const filteredSheet = ss.getSheetByName("排入考程的補考名單");
-  const [headers, ...data] = filteredSheet.getDataRange().getValues();
-  const smallBagSerialColumn = headers.indexOf("小袋序號");
-  const classColumn = headers.indexOf("班級");
-  const stdNumberColumn = headers.indexOf("學號");
-  const stdNameColumn = headers.indexOf("姓名");
-  const subjectNameColumn = headers.indexOf("科目名稱");
+function buildSmallBagStudentTable(smallBagNumber){
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  const filteredSheet = spreadsheet.getSheetByName("排入考程的補考名單");
+  const [headerRow, ...candidateRows] = filteredSheet.getDataRange().getValues();
+  const smallBagIndex = headerRow.indexOf("小袋序號");
+  const classIndex = headerRow.indexOf("班級");
+  const studentNumberIndex = headerRow.indexOf("學號");
+  const studentNameIndex = headerRow.indexOf("姓名");
+  const subjectIndex = headerRow.indexOf("科目名稱");
 
-  const studentsTable = [["", "班級", "學號", "姓名", "科目", "缺考"]];
-  data.forEach(
-    function (row){
-      if (row[smallBagSerialColumn] == smallBagSerial){
-        studentsTable.push(
-          [parseInt(studentsTable.length).toString() ,row[classColumn], row[stdNumberColumn], row[stdNameColumn], row[subjectNameColumn], ""]
+  const studentTable = [["", "班級", "學號", "姓名", "科目", "缺考"]];
+  candidateRows.forEach(
+    function(examineeRow){
+      if (examineeRow[smallBagIndex] === smallBagNumber){
+        studentTable.push(
+          [parseInt(studentTable.length).toString(), examineeRow[classIndex], examineeRow[studentNumberIndex], examineeRow[studentNameIndex], examineeRow[subjectIndex], ""]
         );
       }
     }
   );
 
-  return studentsTable;
+  return studentTable;
 }
 
 
-function mergeToBigBag(){
-  // 先產生合併大袋用的資料
-  // generateBigBagData();
+function mergeBigBagPdfFiles(){
+  // composeBigBagDataset(); // 保留人工設定監考教師的彈性，必要時再手動呼叫。
 
-  const runtimeCountStart = new Date();
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const parametersSheet = ss.getSheetByName("參數區");
-  const bigBagSheet = ss.getSheetByName("大袋封面套印用資料");
-  const [headers,...data] = bigBagSheet.getDataRange().getValues();
-  const schoolYear = parametersSheet.getRange("B2").getValue();
-  const semester = parametersSheet.getRange("B3").getValue();
-  const folderId = parametersSheet.getRange("B10").getValue();
-  const bigTemplateId = parametersSheet.getRange("B11").getValue();
-  const bigTemplate = DriveApp.getFileById(bigTemplateId);
-  const makeUpDate = parametersSheet.getRange("B13").getValue();
-  const folder = DriveApp.getFolderById(folderId);
+  const runtimeStart = new Date();
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  const parameterSheet = spreadsheet.getSheetByName("參數區");
+  const bigBagSheet = spreadsheet.getSheetByName("大袋封面套印用資料");
+  const [headerRow, ...bigBagRows] = bigBagSheet.getDataRange().getValues();
+  const schoolYearValue = parameterSheet.getRange("B2").getValue();
+  const semesterValue = parameterSheet.getRange("B3").getValue();
+  const destinationFolderId = parameterSheet.getRange("B10").getValue();
+  const templateId = parameterSheet.getRange("B11").getValue();
+  const templateFile = DriveApp.getFileById(templateId);
+  const examDateValue = parameterSheet.getRange("B13").getValue();
+  const destinationFolder = DriveApp.getFolderById(destinationFolderId);
 
-  // 學年度	學期	小袋序號	節次	時間	試場	班級	科目名稱	任課老師	小袋人數	電腦	人工
-  const schoolYearColumn = headers.indexOf("學年度");
-  const semesterColumn = headers.indexOf("學期");
-  const bigBagSerialColumn = headers.indexOf("大袋序號");
-  const sessionColumn = headers.indexOf("節次");
-  const classroomColumn = headers.indexOf("試場");
-  const timeColumn = headers.indexOf("時間");
-  const smallBagColumn = headers.indexOf("試卷袋序號");
-  const teacherColumn = headers.indexOf("監考教師");
-  const bigBagPopulationColumn = headers.indexOf("各試場人數");
+  const schoolYearIndex = headerRow.indexOf("學年度");
+  const semesterIndex = headerRow.indexOf("學期");
+  const bigBagIndex = headerRow.indexOf("大袋序號");
+  const sessionIndex = headerRow.indexOf("節次");
+  const roomIndex = headerRow.indexOf("試場");
+  const timeIndex = headerRow.indexOf("時間");
+  const paperBagRangeIndex = headerRow.indexOf("試卷袋序號");
+  const invigilatorIndex = headerRow.indexOf("監考教師");
+  const populationIndex = headerRow.indexOf("各試場人數");
 
-  const BATCH_SIZE = 50;  // 每個 PDF 檔的頁數，太大或太小的數字都會減慢整體速度
-  const numberOfDigits = data.length.toString().length;
+  const batchSize = 50;
+  const digitCount = bigBagRows.length.toString().length;
 
-  let mergedFilename = schoolYear + "學年度第" + semester + "學期補考大袋封面";
-  let mergedFile = bigTemplate.makeCopy(mergedFilename, folder);
-  let mergedDoc = DocumentApp.openById(mergedFile.getId());
-  let mergedBody = mergedDoc.getBody().clear();
+  let mergedFileName = schoolYearValue + "學年度第" + semesterValue + "學期補考大袋封面";
+  let mergedDocFile = templateFile.makeCopy(mergedFileName, destinationFolder);
+  let mergedDocument = DocumentApp.openById(mergedDocFile.getId());
+  let mergedBody = mergedDocument.getBody().clear();
 
-  let tmpFile = bigTemplate.makeCopy("暫時的大袋" , folder);
-  let tmpDoc = DocumentApp.openById(tmpFile.getId());
-  let tmpBody = tmpDoc.getBody();
-  let tmpBodyClone = tmpBody.copy();
-  const numberOfListItems = tmpBody.getListItems().length;
+  let temporaryFile = templateFile.makeCopy("暫時的大袋" , destinationFolder);
+  let temporaryDocument = DocumentApp.openById(temporaryFile.getId());
+  let temporaryBody = temporaryDocument.getBody();
+  let temporaryBodyClone = temporaryBody.copy();
+  const listItemCount = temporaryBody.getListItems().length;
 
-  for (let i=0; i < data.length; i++){
-    tmpBodyClone.replaceText("«學年度»" ,data[i][schoolYearColumn]);
-    tmpBodyClone.replaceText("«學期»" ,data[i][semesterColumn]);
-    tmpBodyClone.replaceText("«大袋序號»" ,data[i][bigBagSerialColumn]);
-    tmpBodyClone.replaceText("«節次»" ,data[i][sessionColumn]);
-    tmpBodyClone.replaceText("«試場»" ,data[i][classroomColumn]);
-    tmpBodyClone.replaceText("«補考日期»", makeUpDate);
-    tmpBodyClone.replaceText("«時間»" ,data[i][timeColumn]);
-    tmpBodyClone.replaceText("«試卷袋序號»" ,data[i][smallBagColumn]);
-    tmpBodyClone.replaceText("«監考教師»" ,data[i][teacherColumn]);
-    tmpBodyClone.replaceText("«各試場人數»" ,data[i][bigBagPopulationColumn]);
+  for (let rowIndex = 0; rowIndex < bigBagRows.length; rowIndex++){
+    temporaryBodyClone.replaceText("«學年度»" ,bigBagRows[rowIndex][schoolYearIndex]);
+    temporaryBodyClone.replaceText("«學期»" ,bigBagRows[rowIndex][semesterIndex]);
+    temporaryBodyClone.replaceText("«大袋序號»" ,bigBagRows[rowIndex][bigBagIndex]);
+    temporaryBodyClone.replaceText("«節次»" ,bigBagRows[rowIndex][sessionIndex]);
+    temporaryBodyClone.replaceText("«試場»" ,bigBagRows[rowIndex][roomIndex]);
+    temporaryBodyClone.replaceText("«補考日期»", examDateValue);
+    temporaryBodyClone.replaceText("«時間»" ,bigBagRows[rowIndex][timeIndex]);
+    temporaryBodyClone.replaceText("«試卷袋序號»" ,bigBagRows[rowIndex][paperBagRangeIndex]);
+    temporaryBodyClone.replaceText("«監考教師»" ,bigBagRows[rowIndex][invigilatorIndex]);
+    temporaryBodyClone.replaceText("«各試場人數»" ,bigBagRows[rowIndex][populationIndex]);
 
-    mergedBody.appendParagraph(tmpBodyClone.getParagraphs()[0].copy());
-    mergedBody.appendParagraph(tmpBodyClone.getParagraphs()[1].copy());
-    mergedBody.appendTable(tmpBodyClone.getTables()[0].copy());
+    mergedBody.appendParagraph(temporaryBodyClone.getParagraphs()[0].copy());
+    mergedBody.appendParagraph(temporaryBodyClone.getParagraphs()[1].copy());
+    mergedBody.appendTable(temporaryBodyClone.getTables()[0].copy());
 
-    // 將最後幾個 ListItem 重新編碼
-    const newLists = mergedBody.getListItems();
-    const tmpList = mergedBody.appendListItem("暫");
-    for (let j=newLists.length - 1; j > newLists.length - numberOfListItems - 1; j--){
-      newLists[j].setListId(tmpList);
+    const listItems = mergedBody.getListItems();
+    const placeholderList = mergedBody.appendListItem("暫");
+    for (let listIndex = listItems.length - 1; listIndex > listItems.length - listItemCount - 1; listIndex--){
+      listItems[listIndex].setListId(placeholderList);
     }
     mergedBody.appendParagraph("");
-    tmpList.removeFromParent();
+    placeholderList.removeFromParent();
 
-    if (i % BATCH_SIZE != BATCH_SIZE - 1){
+    if (rowIndex % batchSize !== batchSize - 1){
       mergedBody.appendPageBreak();
     }
 
-    // 建立新的 tmp file
-    tmpBodyClone = tmpBody.copy();
+    temporaryBodyClone = temporaryBody.copy();
     
-    if(i % BATCH_SIZE == BATCH_SIZE - 1){
-      // 設定字體後存檔
+    if(rowIndex % batchSize === batchSize - 1){
       mergedBody.editAsText().setFontFamily("Noto Sans TC");
-      mergedDoc.saveAndClose();
+      mergedDocument.saveAndClose();
 
-      // 轉換成 PDF 檔，且在檔名加上小袋序號的範圍
-      const pdfBlob = mergedFile.getAs('application/pdf');
-      const pdfName = mergedFilename + "_" + ( 1 + BATCH_SIZE * Math.floor(i / BATCH_SIZE)).toLocaleString('en-US', {minimumIntegerDigits: numberOfDigits, useGrouping:false}) + "-" + (BATCH_SIZE * (1 + Math.floor(i / BATCH_SIZE))).toLocaleString('en-US', {minimumIntegerDigits: numberOfDigits, useGrouping:false})  + ".pdf";
+      const pdfBlob = mergedDocFile.getAs('application/pdf');
+      const pdfName =
+        mergedFileName + "_" +
+        ( 1 + batchSize * Math.floor(rowIndex / batchSize)).toLocaleString('en-US', {minimumIntegerDigits: digitCount, useGrouping:false}) +
+        "-" +
+        (batchSize * (1 + Math.floor(rowIndex / batchSize))).toLocaleString('en-US', {minimumIntegerDigits: digitCount, useGrouping:false}) +
+        ".pdf";
       const pdfFile = DriveApp.createFile(pdfBlob).setName(pdfName);
-      pdfFile.moveTo(folder);
+      pdfFile.moveTo(destinationFolder);
 
-      // 把舊的 mergedFile 移到垃圾桶後，再重新產生新的 mergedFile
-      mergedFile.setTrashed(true);
+      mergedDocFile.setTrashed(true);
 
-      // 不是最後一筆，後面還有其他筆資料時，才產生新的檔案
-      if (i != data.length - 1){
-        mergedFile = bigTemplate.makeCopy(mergedFilename, folder);
-        mergedDoc = DocumentApp.openById(mergedFile.getId());
-        mergedBody = mergedDoc.getBody().clear();
+      if (rowIndex !== bigBagRows.length - 1){
+        mergedDocFile = templateFile.makeCopy(mergedFileName, destinationFolder);
+        mergedDocument = DocumentApp.openById(mergedDocFile.getId());
+        mergedBody = mergedDocument.getBody().clear();
       }
     }
   }
 
-  // 將暫存檔移到垃圾桶
-  tmpDoc.saveAndClose();
-  DriveApp.getFileById(tmpDoc.getId()).setTrashed(true);
+  temporaryDocument.saveAndClose();
+  DriveApp.getFileById(temporaryDocument.getId()).setTrashed(true);
 
-  // 真的有畸零筆數所成的檔案才存檔
-  if (data.length % BATCH_SIZE != 0){
-    // 設定字體為 Noto Sans TC 後存檔
+  if (bigBagRows.length % batchSize !== 0){
     mergedBody.editAsText().setFontFamily("Noto Sans TC");
-    mergedDoc.saveAndClose();
+    mergedDocument.saveAndClose();
 
-    // 把最後一批轉換成 PDF 檔
-    const pdfBlob = mergedFile.getAs('application/pdf');
-    const pdfName = mergedFilename + "_" + (BATCH_SIZE * Math.floor(data.length / BATCH_SIZE).toLocaleString('en-US', {minimumIntegerDigits: numberOfDigits, useGrouping:false}) + 1) + "-" + data.length + ".pdf";
+    const pdfBlob = mergedDocFile.getAs('application/pdf');
+    const pdfName =
+      mergedFileName + "_" +
+      (batchSize * Math.floor(bigBagRows.length / batchSize).toLocaleString('en-US', {minimumIntegerDigits: digitCount, useGrouping:false}) + 1) +
+      "-" +
+      bigBagRows.length +
+      ".pdf";
     const pdfFile = DriveApp.createFile(pdfBlob).setName(pdfName);
-    pdfFile.moveTo(folder);
+    pdfFile.moveTo(destinationFolder);
   }
-  mergedFile.setTrashed(true);
+  mergedDocFile.setTrashed(true);
 
-  const newRuntime = runtimeCountStop(runtimeCountStart);
-  SpreadsheetApp.getUi().alert("已完成大袋封面合併列印，共" + data.length + "頁，使用" + newRuntime + "秒。");
+  const elapsedSeconds = calculateElapsedSeconds(runtimeStart);
+  SpreadsheetApp.getUi().alert("已完成大袋封面合併列印，共" + bigBagRows.length + "頁，使用" + elapsedSeconds + "秒。");
 }

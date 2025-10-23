@@ -1,29 +1,29 @@
-function setRangeValues(range, data){
-  if (range.getLastColumn() == data[0].length){
-    range.setValues(data);
+function writeRangeValuesSafely(targetRange, valueMatrix){
+  if (targetRange.getLastColumn() === valueMatrix[0].length){
+    targetRange.setValues(valueMatrix);
   } else {
     SpreadsheetApp.getUi().alert("欲寫入範圍欄數不足！");
   }
 }
 
 
-function runtimeCountStop(start) {
-  const stop = new Date();
-  const newRuntime = Number(stop) - Number(start);
-  return Math.ceil(newRuntime/1000);
+function calculateElapsedSeconds(startTimestamp) {
+  const endTimestamp = new Date();
+  const elapsedMillis = Number(endTimestamp) - Number(startTimestamp);
+  return Math.ceil(elapsedMillis / 1000);
 }
 
 
-function countTimeConsume(runner){
-  const startTime = new Date();
-  runner();
-  const endTime = new Date();
-  const runtime = Math.ceil(Number(endTime) - Number(startTime))/1000;
-  return runtime;
+function measureCallbackSeconds(callback){
+  const startTimestamp = new Date();
+  callback();
+  const endTimestamp = new Date();
+  const elapsedMillis = Number(endTimestamp) - Number(startTimestamp);
+  return Math.ceil(elapsedMillis / 1000);
 }
 
 
-function getClassCode(cls){
+function deriveClassCode(className){
   // 班級代碼查詢
   // 輸入班級中文名稱(4字)，輸出6碼數字代碼
   // 如輸入「機械二丁」，輸出「301204」。
@@ -51,23 +51,23 @@ function getClassCode(cls){
     "三": "3"
   };
 
-  return departmentCodes[cls.slice(0,2)] + classAndGradeCode[cls.slice(2,3)] + classAndGradeCode[cls.slice(-1)];
+  return departmentCodes[className.slice(0,2)] + classAndGradeCode[className.slice(2,3)] + classAndGradeCode[className.slice(-1)];
 }
 
 
-function getGrade(cls){
-  const grade = {
+function deriveGradeLevel(className){
+  const gradeMapping = {
     "一": "1",
     "二": "2",
     "三": "3"
   };
 
-  return grade[cls.slice(2,3)];
+  return gradeMapping[className.slice(2,3)];
 }
 
 
-function getDepartmentName(cls){
-  const departments = {
+function lookupDepartmentName(className){
+  const departmentNames = {
     "機械": "機械科",
     "汽車": "汽車科",
     "資訊": "資訊科",
@@ -80,5 +80,5 @@ function getDepartmentName(cls){
     "電圖": "電腦機械製圖科"
   };
 
-  return departments[cls.slice(0,2)];
+  return departmentNames[className.slice(0,2)];
 }
