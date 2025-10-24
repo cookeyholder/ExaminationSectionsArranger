@@ -1,8 +1,6 @@
 function updateUnfilteredSubjectCodes() {
-  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  const parameterSheet = spreadsheet.getSheetByName("參數區");
-  const unfilteredSource = spreadsheet.getSheetByName("註冊組補考名單");
-  const [unfilteredHeaders, ...unfilteredRows] = unfilteredSource.getDataRange().getValues();
+  const currentSchoolYear = parseInt(PARAMETERS_SHEET.getRange("B2").getValue());
+  const [unfilteredHeaders, ...unfilteredRows] = UNFILTERED_MAKEUP_SHEET.getDataRange().getValues();
 
   const classColumnIndex = unfilteredHeaders.indexOf("班級");
   const subjectColumnIndex = unfilteredHeaders.indexOf("科目");
@@ -23,9 +21,9 @@ function updateUnfilteredSubjectCodes() {
   };
 
   const gradeYearMap = {
-    "一": parseInt(parameterSheet.getRange("B2").getValue()),
-    "二": parseInt(parameterSheet.getRange("B2").getValue()) - 1,
-    "三": parseInt(parameterSheet.getRange("B2").getValue()) - 2,
+    "一": currentSchoolYear,
+    "二": currentSchoolYear - 1,
+    "三": currentSchoolYear - 2,
   };
 
   const patchedRows = [];
@@ -47,7 +45,7 @@ function updateUnfilteredSubjectCodes() {
   );
 
   if(patchedRows.length === unfilteredRows.length){
-    writeRangeValuesSafely(unfilteredSource.getRange(2, 1, patchedRows.length, patchedRows[0].length), patchedRows);
+    writeRangeValuesSafely(UNFILTERED_MAKEUP_SHEET.getRange(2, 1, patchedRows.length, patchedRows[0].length), patchedRows);
   } else {
     Logger.log("課程代碼補完失敗！");
     SpreadsheetApp.getUi().alert("課程代碼補完失敗！");
@@ -56,10 +54,8 @@ function updateUnfilteredSubjectCodes() {
 
 
 function updateOpenCourseCodes() {
-  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  const parameterSheet = spreadsheet.getSheetByName("參數區");
-  const openCourseSheet = spreadsheet.getSheetByName("開課資料(查詢任課教師用)");
-  const [openHeaders, ...openRows] = openCourseSheet.getDataRange().getValues();
+  const currentSchoolYear = parseInt(PARAMETERS_SHEET.getRange("B2").getValue());
+  const [openHeaders, ...openRows] = OPEN_COURSE_LOOKUP_SHEET.getDataRange().getValues();
 
   const classColumnIndex = openHeaders.indexOf("班級名稱");
   const codeColumnIndex = openHeaders.indexOf("科目代碼");
@@ -79,9 +75,9 @@ function updateOpenCourseCodes() {
   };
 
   const gradeYearMap = {
-    "一": parseInt(parameterSheet.getRange("B2").getValue()),
-    "二": parseInt(parameterSheet.getRange("B2").getValue()) - 1,
-    "三": parseInt(parameterSheet.getRange("B2").getValue()) - 2,
+    "一": currentSchoolYear,
+    "二": currentSchoolYear - 1,
+    "三": currentSchoolYear - 2,
   };
 
   const patchedRows = [];
@@ -100,7 +96,7 @@ function updateOpenCourseCodes() {
   );
 
   if(patchedRows.length === openRows.length){
-    writeRangeValuesSafely(openCourseSheet.getRange(2, 1, patchedRows.length, patchedRows[0].length), patchedRows);
+    writeRangeValuesSafely(OPEN_COURSE_LOOKUP_SHEET.getRange(2, 1, patchedRows.length, patchedRows[0].length), patchedRows);
   } else {
     Logger.log("開課資料課程代碼補完失敗！");
     SpreadsheetApp.getUi().alert("開課資料課程代碼補完失敗！");
@@ -109,14 +105,9 @@ function updateOpenCourseCodes() {
 
 
 function buildFilteredCandidateList(){
-  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  const unfilteredSource = spreadsheet.getSheetByName("註冊組補考名單");
-  const candidateSheet = spreadsheet.getSheetByName("教學組排入考程的科目");
-  const openCourseSheet = spreadsheet.getSheetByName("開課資料(查詢任課教師用)");
-  const filteredSheet = spreadsheet.getSheetByName("排入考程的補考名單");
-  const [candidateHeaders, ...candidateRows] = candidateSheet.getDataRange().getValues();
-  const [unfilteredHeaders, ...unfilteredRows] = unfilteredSource.getDataRange().getValues();
-  const [openHeaders, ...openRows] = openCourseSheet.getDataRange().getValues();
+  const [candidateHeaders, ...candidateRows] = TEACHING_SELECTION_SHEET.getDataRange().getValues();
+  const [unfilteredHeaders, ...unfilteredRows] = UNFILTERED_MAKEUP_SHEET.getDataRange().getValues();
+  const [openHeaders, ...openRows] = OPEN_COURSE_LOOKUP_SHEET.getDataRange().getValues();
 
   const studentNumberIndex = unfilteredHeaders.indexOf("學號");
   const classNameIndex = unfilteredHeaders.indexOf("班級");
@@ -158,7 +149,6 @@ function buildFilteredCandidateList(){
     }
   );
 
-  // 清除「排入考程的補考名單」內容
   resetFilteredSheets();
 
   const filteredRows = [];
@@ -195,21 +185,20 @@ function buildFilteredCandidateList(){
     }
   );
 
-  filteredSheet.getRange(2, 1, filteredRows.length, filteredRows[0].length)
-    .setNumberFormat('@STRING@')  // 改成純文字格式，以免 0 開頭的學號被去掉前面的 0，造成位數錯誤
+  FILTERED_RESULT_SHEET.getRange(2, 1, filteredRows.length, filteredRows[0].length)
+    .setNumberFormat('@STRING@')
     .setValues(filteredRows);
 }
 
 
 function markVisibleCandidateCheckboxes(){
-  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  const candidateRange = spreadsheet.getSheetByName("教學組排入考程的科目").getRange("A2:A");
+  const candidateRange = TEACHING_SELECTION_SHEET.getRange("A2:A");
   const checkboxValues = candidateRange.getValues();
   const totalRows = candidateRange.getNumRows();
   const totalColumns = candidateRange.getNumColumns();
 
   for(let rowIndex = 0; rowIndex < totalRows; rowIndex++){
-    if(!spreadsheet.isRowHiddenByFilter(rowIndex + 1)){
+    if(!ACTIVE_SPREADSHEET.isRowHiddenByFilter(rowIndex + 1)){
       for(let columnIndex = 0; columnIndex < totalColumns; columnIndex++){
         checkboxValues[rowIndex][columnIndex] = true;
       }
@@ -221,14 +210,13 @@ function markVisibleCandidateCheckboxes(){
 
 
 function clearCandidateCheckboxes(){
-  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  const candidateRange = spreadsheet.getSheetByName("教學組排入考程的科目").getRange("A1:A");
+  const candidateRange = TEACHING_SELECTION_SHEET.getRange("A1:A");
   const checkboxValues = candidateRange.getValues();
   const totalRows = candidateRange.getNumRows();
   const totalColumns = candidateRange.getNumColumns();
 
   for(let rowIndex = 0; rowIndex < totalRows; rowIndex++){
-    if(!spreadsheet.isRowHiddenByFilter(rowIndex + 1)){
+    if(!ACTIVE_SPREADSHEET.isRowHiddenByFilter(rowIndex + 1)){
       for(let columnIndex = 0; columnIndex < totalColumns; columnIndex++){
         checkboxValues[rowIndex][columnIndex] = false;
       }

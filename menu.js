@@ -39,19 +39,12 @@ function resetFilteredSheets(){
   // (2) 刪除多餘的列到只剩5列
   // (3) 填入欄位標題
 
-  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  const filteredSheet = spreadsheet.getSheetByName("排入考程的補考名單");
-  const smallBagSheet = spreadsheet.getSheetByName("小袋封面套印用資料");
-  const bigBagSheet = spreadsheet.getSheetByName("大袋封面套印用資料");
-  const bulletinSheet = spreadsheet.getSheetByName("公告版補考場次");
-  const recordSheet = spreadsheet.getSheetByName("試場紀錄表(A表)");
-  
   // 清除所有值
-  filteredSheet.clear();
-  smallBagSheet.clear();
-  bigBagSheet.clear();
-  bulletinSheet.clear();
-  recordSheet.clear();
+  FILTERED_RESULT_SHEET.clear();
+  SMALL_BAG_DATA_SHEET.clear();
+  BIG_BAG_DATA_SHEET.clear();
+  BULLETIN_OUTPUT_SHEET.clear();
+  RECORD_OUTPUT_SHEET.clear();
 
   // 將課程代碼補完，包括：「註冊組匯出的補考名單」、「開課資料(查詢任課教師用)」
   updateUnfilteredSubjectCodes();
@@ -60,14 +53,14 @@ function resetFilteredSheets(){
 
   // 清空資料並設置標題列
   const headers = ["科別", "年級", "班級代碼", "班級","座號",	"學號",	"姓名","科目名稱","節次", "試場", "小袋序號", "小袋人數", "大袋序號", "大袋人數", "班級人數", "時間", "電腦", "人工", "任課老師"];
-  filteredSheet.clear();
-  filteredSheet.appendRow(headers);
+  FILTERED_RESULT_SHEET.clear();
+  FILTERED_RESULT_SHEET.appendRow(headers);
 
   // 移除已有篩選器，重新設置新的篩選器
-  if(filteredSheet.getDataRange().getFilter()){
-    filteredSheet.getDataRange().getFilter().remove();
+  if(FILTERED_RESULT_SHEET.getDataRange().getFilter()){
+    FILTERED_RESULT_SHEET.getDataRange().getFilter().remove();
   }
-  filteredSheet.getDataRange().createFilter();
+  FILTERED_RESULT_SHEET.getDataRange().createFilter();
 }
 
 

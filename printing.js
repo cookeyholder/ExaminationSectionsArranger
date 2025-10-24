@@ -2,16 +2,13 @@ function mergeSmallBagPdfFiles(){
   composeSmallBagDataset();
 
   const runtimeStart = new Date();
-  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  const parameterSheet = spreadsheet.getSheetByName("參數區");
-  const smallBagSheet = spreadsheet.getSheetByName("小袋封面套印用資料");
-  const [headerRow, ...smallBagRows] = smallBagSheet.getDataRange().getValues();
-  const schoolYearValue = parameterSheet.getRange("B2").getValue();
-  const semesterValue = parameterSheet.getRange("B3").getValue();
-  const destinationFolderId = parameterSheet.getRange("B10").getValue();
-  const templateId = parameterSheet.getRange("B12").getValue();
+  const [headerRow, ...smallBagRows] = SMALL_BAG_DATA_SHEET.getDataRange().getValues();
+  const schoolYearValue = PARAMETERS_SHEET.getRange("B2").getValue();
+  const semesterValue = PARAMETERS_SHEET.getRange("B3").getValue();
+  const destinationFolderId = PARAMETERS_SHEET.getRange("B10").getValue();
+  const templateId = PARAMETERS_SHEET.getRange("B12").getValue();
   const templateFile = DriveApp.getFileById(templateId);
-  const examDateValue = parameterSheet.getRange("B13").getValue();
+  const examDateValue = PARAMETERS_SHEET.getRange("B13").getValue();
   const destinationFolder = DriveApp.getFolderById(destinationFolderId);
 
   const schoolYearIndex = headerRow.indexOf("學年度");
@@ -36,8 +33,9 @@ function mergeSmallBagPdfFiles(){
   let mergedBody = mergedDocument.getBody();
   mergedBody.removeChild(mergedBody.getTables()[0]);
 
-  let temporaryDocument = DocumentApp.openById(templateFile.makeCopy("暫時的小袋" , destinationFolder).getId());
-  let temporaryBody = temporaryDocument.getBody();
+  const temporaryDocFile = templateFile.makeCopy("暫時的小袋" , destinationFolder);
+  const temporaryDocument = DocumentApp.openById(temporaryDocFile.getId());
+  const temporaryBody = temporaryDocument.getBody();
   let temporaryBodyClone = temporaryBody.copy();
 
   for (let rowIndex = 0; rowIndex < smallBagRows.length; rowIndex++){
@@ -140,9 +138,7 @@ function mergeSmallBagPdfFiles(){
 
 
 function buildSmallBagStudentTable(smallBagNumber){
-  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  const filteredSheet = spreadsheet.getSheetByName("排入考程的補考名單");
-  const [headerRow, ...candidateRows] = filteredSheet.getDataRange().getValues();
+  const [headerRow, ...candidateRows] = FILTERED_RESULT_SHEET.getDataRange().getValues();
   const smallBagIndex = headerRow.indexOf("小袋序號");
   const classIndex = headerRow.indexOf("班級");
   const studentNumberIndex = headerRow.indexOf("學號");
@@ -165,19 +161,14 @@ function buildSmallBagStudentTable(smallBagNumber){
 
 
 function mergeBigBagPdfFiles(){
-  // composeBigBagDataset(); // 保留人工設定監考教師的彈性，必要時再手動呼叫。
-
   const runtimeStart = new Date();
-  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  const parameterSheet = spreadsheet.getSheetByName("參數區");
-  const bigBagSheet = spreadsheet.getSheetByName("大袋封面套印用資料");
-  const [headerRow, ...bigBagRows] = bigBagSheet.getDataRange().getValues();
-  const schoolYearValue = parameterSheet.getRange("B2").getValue();
-  const semesterValue = parameterSheet.getRange("B3").getValue();
-  const destinationFolderId = parameterSheet.getRange("B10").getValue();
-  const templateId = parameterSheet.getRange("B11").getValue();
+  const [headerRow, ...bigBagRows] = BIG_BAG_DATA_SHEET.getDataRange().getValues();
+  const schoolYearValue = PARAMETERS_SHEET.getRange("B2").getValue();
+  const semesterValue = PARAMETERS_SHEET.getRange("B3").getValue();
+  const destinationFolderId = PARAMETERS_SHEET.getRange("B10").getValue();
+  const templateId = PARAMETERS_SHEET.getRange("B11").getValue();
   const templateFile = DriveApp.getFileById(templateId);
-  const examDateValue = parameterSheet.getRange("B13").getValue();
+  const examDateValue = PARAMETERS_SHEET.getRange("B13").getValue();
   const destinationFolder = DriveApp.getFolderById(destinationFolderId);
 
   const schoolYearIndex = headerRow.indexOf("學年度");
@@ -198,9 +189,9 @@ function mergeBigBagPdfFiles(){
   let mergedDocument = DocumentApp.openById(mergedDocFile.getId());
   let mergedBody = mergedDocument.getBody().clear();
 
-  let temporaryFile = templateFile.makeCopy("暫時的大袋" , destinationFolder);
-  let temporaryDocument = DocumentApp.openById(temporaryFile.getId());
-  let temporaryBody = temporaryDocument.getBody();
+  const temporaryDocFile = templateFile.makeCopy("暫時的大袋" , destinationFolder);
+  const temporaryDocument = DocumentApp.openById(temporaryDocFile.getId());
+  const temporaryBody = temporaryDocument.getBody();
   let temporaryBodyClone = temporaryBody.copy();
   const listItemCount = temporaryBody.getListItems().length;
 

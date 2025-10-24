@@ -1,9 +1,6 @@
 function scheduleCommonSubjectSessions(){
-  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  const parameterSheet = spreadsheet.getSheetByName("參數區");
-  const sessionRuleRows = parameterSheet.getRange(2, 5, 21, 2).getValues();
-  const filteredSheet = spreadsheet.getSheetByName("排入考程的補考名單");
-  const [headerRow, ...candidateRows] = filteredSheet.getDataRange().getValues();
+  const sessionRuleRows = PARAMETERS_SHEET.getRange(2, 5, 21, 2).getValues();
+  const [headerRow, ...candidateRows] = FILTERED_RESULT_SHEET.getDataRange().getValues();
   const subjectNameIndex = headerRow.indexOf("科目名稱");
   const sessionIndex = headerRow.indexOf("節次");
 
@@ -28,7 +25,7 @@ function scheduleCommonSubjectSessions(){
   );
 
   if(updatedRows.length === candidateRows.length){
-    writeRangeValuesSafely(filteredSheet.getRange(2, 1, updatedRows.length, updatedRows[0].length), updatedRows);
+    writeRangeValuesSafely(FILTERED_RESULT_SHEET.getRange(2, 1, updatedRows.length, updatedRows[0].length), updatedRows);
   } else {
     Logger.log("安排共同科目節次時，合併後的資料筆數和原有的筆數不同！");
     SpreadsheetApp.getUi().alert("安排共同科目節次時，合併後的資料筆數和原有的筆數不同！");
@@ -37,14 +34,11 @@ function scheduleCommonSubjectSessions(){
 
 
 function scheduleSpecializedSubjectSessions(){
-  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  const filteredSheet = spreadsheet.getSheetByName("排入考程的補考名單");
-  const [headerRow, ...candidateRows] = filteredSheet.getDataRange().getValues();
+  const [headerRow, ...candidateRows] = FILTERED_RESULT_SHEET.getDataRange().getValues();
   const sessionIndex = headerRow.indexOf("節次");
 
-  const parameterSheet = spreadsheet.getSheetByName("參數區");
-  const maxSessionCount = parameterSheet.getRange("B5").getValue();
-  const sessionCapacity = 0.9 * parameterSheet.getRange("B9").getValue();
+  const maxSessionCount = PARAMETERS_SHEET.getRange("B5").getValue();
+  const sessionCapacity = 0.9 * PARAMETERS_SHEET.getRange("B9").getValue();
 
   const departmentGradeSubjectCounts = Object.entries(fetchDepartmentGradeSubjectCounts()).sort(compareCountDescending);
   const sessionSnapshots = buildSessionStatistics();
@@ -87,7 +81,7 @@ function scheduleSpecializedSubjectSessions(){
   }
     
   if(combinedRows.length === candidateRows.length){
-    writeRangeValuesSafely(filteredSheet.getRange(2, 1, combinedRows.length, combinedRows[0].length), combinedRows);
+    writeRangeValuesSafely(FILTERED_RESULT_SHEET.getRange(2, 1, combinedRows.length, combinedRows[0].length), combinedRows);
   } else {
     Logger.log("無法將所有人排入 " + maxSessionCount + " 節，請檢查是否有某科年級須補考 " + parseInt(maxSessionCount + 1) +" 科以上！");
     SpreadsheetApp.getUi().alert("無法將所有人排入 " + maxSessionCount + "節，請檢查是否有某科年級須補考 10 科以上！");
@@ -96,18 +90,15 @@ function scheduleSpecializedSubjectSessions(){
 
 
 function assignExamRooms(){
-  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  const filteredSheet = spreadsheet.getSheetByName("排入考程的補考名單");
-  const [headerRow, ...candidateRows] = filteredSheet.getDataRange().getValues();
+  const [headerRow, ...candidateRows] = FILTERED_RESULT_SHEET.getDataRange().getValues();
   const classIndex = headerRow.indexOf("班級");
   const subjectIndex = headerRow.indexOf("科目名稱");
   const roomIndex = headerRow.indexOf("試場");
 
-  const parameterSheet = spreadsheet.getSheetByName("參數區");
-  const maxSessionCount = parameterSheet.getRange("B5").getValue();
-  const maxRoomCount = parameterSheet.getRange("B6").getValue();
-  const maxStudentsPerRoom = parameterSheet.getRange("B7").getValue();
-  const maxSubjectsPerRoom = parameterSheet.getRange("B8").getValue();
+  const maxSessionCount = PARAMETERS_SHEET.getRange("B5").getValue();
+  const maxRoomCount = PARAMETERS_SHEET.getRange("B6").getValue();
+  const maxStudentsPerRoom = PARAMETERS_SHEET.getRange("B7").getValue();
+  const maxSubjectsPerRoom = PARAMETERS_SHEET.getRange("B8").getValue();
 
   const sessionSnapshots = buildSessionStatistics();
 
@@ -165,7 +156,7 @@ function assignExamRooms(){
   }
 
   if(reorderedRows.length === candidateRows.length){
-    writeRangeValuesSafely(filteredSheet.getRange(2, 1, reorderedRows.length, reorderedRows[0].length), reorderedRows);
+    writeRangeValuesSafely(FILTERED_RESULT_SHEET.getRange(2, 1, reorderedRows.length, reorderedRows[0].length), reorderedRows);
   } else {
     Logger.log("現有試場數無法容納所有補考學生，請增加試場數或調整每間試場人數上限！");
     SpreadsheetApp.getUi().alert("現有試場數無法容納所有補考學生，請增加試場數或調整每間試場人數上限！");
@@ -176,7 +167,7 @@ function assignExamRooms(){
     SpreadsheetApp.getUi().alert("部分考生被安排在第9節補考，請注意是否需要調整到中午應試！");
   }
 
-  filteredSheet.getRange("I:J").setNumberFormat('#,##0');
+  FILTERED_RESULT_SHEET.getRange("I:J").setNumberFormat('#,##0');
   sortFilteredStudentsBySessionRoom();
 }
 
@@ -184,9 +175,7 @@ function assignExamRooms(){
 function allocateBagIdentifiers() {
   sortFilteredStudentsBySessionRoom();
 
-  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  const filteredSheet = spreadsheet.getSheetByName("排入考程的補考名單");
-  const [headerRow, ...candidateRows] = filteredSheet.getDataRange().getValues();
+  const [headerRow, ...candidateRows] = FILTERED_RESULT_SHEET.getDataRange().getValues();
   const classIndex = headerRow.indexOf("班級");
   const subjectIndex = headerRow.indexOf("科目名稱");
   const sessionIndex = headerRow.indexOf("節次");
@@ -225,19 +214,16 @@ function allocateBagIdentifiers() {
     }
   );
 
-  writeRangeValuesSafely(filteredSheet.getRange(2, 1, candidateRows.length, candidateRows[0].length), candidateRows);
+  writeRangeValuesSafely(FILTERED_RESULT_SHEET.getRange(2, 1, candidateRows.length, candidateRows[0].length), candidateRows);
 }
 
 
 function populateSessionTimes() {
-  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  const filteredSheet = spreadsheet.getSheetByName("排入考程的補考名單");
-  const [headerRow, ...candidateRows] = filteredSheet.getDataRange().getValues();
+  const [headerRow, ...candidateRows] = FILTERED_RESULT_SHEET.getDataRange().getValues();
   const sessionIndex = headerRow.indexOf("節次");
   const timeIndex = headerRow.indexOf("時間");
 
-  const sessionTimeSheet = spreadsheet.getSheetByName("節次時間表");
-  const [timeHeaders, ...sessionTimeRows] = sessionTimeSheet.getDataRange().getValues();
+  const [timeHeaders, ...sessionTimeRows] = SESSION_TIME_REFERENCE_SHEET.getDataRange().getValues();
 
   const sessionTimeLookup = {};
   sessionTimeRows.forEach(
@@ -254,7 +240,7 @@ function populateSessionTimes() {
   );
 
   if(updatedRows.length === candidateRows.length){
-    writeRangeValuesSafely(filteredSheet.getRange(2, 1, updatedRows.length, updatedRows[0].length), updatedRows);
+    writeRangeValuesSafely(FILTERED_RESULT_SHEET.getRange(2, 1, updatedRows.length, updatedRows[0].length), updatedRows);
   } else {
     Logger.log("寫入節次時間失敗！");
     SpreadsheetApp.getUi().alert("寫入節次時間失敗！");
@@ -263,9 +249,7 @@ function populateSessionTimes() {
 
 
 function updateBagAndClassPopulations() {
-  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  const filteredSheet = spreadsheet.getSheetByName("排入考程的補考名單");
-  const [headerRow, ...candidateRows] = filteredSheet.getDataRange().getValues();
+  const [headerRow, ...candidateRows] = FILTERED_RESULT_SHEET.getDataRange().getValues();
   const classIndex = headerRow.indexOf("班級");
   const bigBagIndex = headerRow.indexOf("大袋序號");
   const smallBagIndex = headerRow.indexOf("小袋序號");
@@ -312,14 +296,12 @@ function updateBagAndClassPopulations() {
     }
   );
 
-  writeRangeValuesSafely(filteredSheet.getRange(2, 1, candidateRows.length, candidateRows[0].length), candidateRows);
+  writeRangeValuesSafely(FILTERED_RESULT_SHEET.getRange(2, 1, candidateRows.length, candidateRows[0].length), candidateRows);
 }
 
 
 function sortFilteredStudentsBySubject(){
-  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  const filteredSheet = spreadsheet.getSheetByName("排入考程的補考名單");
-  const filteredRange = filteredSheet.getDataRange();
+  const filteredRange = FILTERED_RESULT_SHEET.getDataRange();
 
   filteredRange.offset(1,0,filteredRange.getNumRows()-1).sort(
     [
@@ -335,9 +317,7 @@ function sortFilteredStudentsBySubject(){
 
 
 function sortFilteredStudentsByClassSeat(){
-  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  const filteredSheet = spreadsheet.getSheetByName("排入考程的補考名單");
-  const filteredRange = filteredSheet.getDataRange();
+  const filteredRange = FILTERED_RESULT_SHEET.getDataRange();
 
   filteredRange.offset(1,0,filteredRange.getNumRows()-1).sort(
     [
@@ -352,9 +332,7 @@ function sortFilteredStudentsByClassSeat(){
 
 
 function sortFilteredStudentsBySessionRoom(){
-  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  const filteredSheet = spreadsheet.getSheetByName("排入考程的補考名單");
-  const filteredRange = filteredSheet.getDataRange();
+  const filteredRange = FILTERED_RESULT_SHEET.getDataRange();
 
   filteredRange.offset(1,0,filteredRange.getNumRows()-1).sort(
     [
@@ -416,18 +394,14 @@ function summarizeDepartmentGradeSubjectCounts(rowData){
 
 
 function fetchDepartmentGradeCounts(){
-  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  const filteredSheet = spreadsheet.getSheetByName("排入考程的補考名單");
-  const [, ...candidateRows] = filteredSheet.getDataRange().getValues();
+  const [, ...candidateRows] = FILTERED_RESULT_SHEET.getDataRange().getValues();
 
   return summarizeDepartmentGradeCounts(candidateRows);
 }
 
 
 function fetchDepartmentGradeSubjectCounts(){
-  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  const filteredSheet = spreadsheet.getSheetByName("排入考程的補考名單");
-  const [, ...candidateRows] = filteredSheet.getDataRange().getValues();
+  const [, ...candidateRows] = FILTERED_RESULT_SHEET.getDataRange().getValues();
 
   return summarizeDepartmentGradeSubjectCounts(candidateRows);
 }
@@ -456,9 +430,7 @@ function createEmptyClassroomRecord(){
 
 
 function createEmptySessionRecord(){
-  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  const parameterSheet = spreadsheet.getSheetByName("參數區");
-  const maxRoomCount = parameterSheet.getRange("B6").getValue();
+  const maxRoomCount = PARAMETERS_SHEET.getRange("B6").getValue();
   const sessionRecord = {
     classrooms: [],
     students:[], 
@@ -503,12 +475,9 @@ function createEmptySessionRecord(){
 
 
 function buildSessionStatistics(){
-  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  const filteredSheet = spreadsheet.getSheetByName("排入考程的補考名單");
-  const [headerRow, ...candidateRows] = filteredSheet.getDataRange().getValues();
+  const [headerRow, ...candidateRows] = FILTERED_RESULT_SHEET.getDataRange().getValues();
   const sessionIndex = headerRow.indexOf("節次");
-  const parameterSheet = spreadsheet.getSheetByName("參數區");
-  const maxSessionCount = parameterSheet.getRange("B5").getValue();
+  const maxSessionCount = PARAMETERS_SHEET.getRange("B5").getValue();
 
   const sessionRecords = [];
   for(let sessionNumber = 0; sessionNumber < maxSessionCount + 2; sessionNumber++){

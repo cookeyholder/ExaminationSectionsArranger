@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## 專案結構與模組安排
-本專案鎖定 Google Apps Script，所有執行程式碼置於存放庫根目錄。`appsscript.json` 定義部署設定，功能模組依職責拆分為多個檔案：`menu.js` 建立工作列與流程指令（如 `runFullSchedulingPipeline`、`resumePipelineAfterManualAdjustments`），`dataPreparation.js` 處理資料匯入與篩選，`scheduling.js` 集中節次與試場編排邏輯，`reportGeneration.js` 產生公告與列印資料，`printing.js` 封裝 PDF 合併輸出，`helpers.js` 提供共用工具。新增功能時請優先尋找對應模組，必要時再建立新檔案並於文件補充說明。
+本專案鎖定 Google Apps Script，所有執行程式碼置於存放庫根目錄。`appsscript.json` 定義部署設定，功能模組依職責拆分為多個檔案：`globals.js` 常用工作表實體，`menu.js` 建立工作列與流程指令（如 `runFullSchedulingPipeline`、`resumePipelineAfterManualAdjustments`），`dataPreparation.js` 處理資料匯入與篩選，`scheduling.js` 集中節次與試場編排邏輯，`reportGeneration.js` 產生公告與列印資料，`printing.js` 封裝 PDF 合併輸出，`helpers.js` 提供共用工具。新增功能時請優先尋找對應模組，必要時再建立新檔案並於文件補充說明。
 
 ## 建置、測試與開發指令
 開發流程採用 Apps Script CLI：先執行 `npm install -g @google/clasp` 完成安裝，之後以 `clasp login` 認證帳號；`clasp push` 上傳目前檔案至連結的腳本專案，`clasp pull` 則同步遠端變更。臨時驗證可在試算表中開啟 Apps Script 編輯器，但請確保最終變更回存到版本庫並透過 `clasp push` 部署。
