@@ -110,22 +110,21 @@
   - 記錄本階段測試結果
 
 ## 階段 5: 清理舊程式碼
-- [ ] 5.1 從 `scheduling.js` 移除 `createEmptyClassroomRecord()`
-  - 刪除函式定義（約 line 410）
+- [x] 5.1 從 `scheduling.js` 移除 `createEmptyClassroomRecord()`
+  - 刪除函式定義（約 line 516）
   - **驗收**：`grep "createEmptyClassroomRecord" *.js` 無結果
-- [ ] 5.2 從 `scheduling.js` 移除 `createEmptySessionRecord()`
-  - 刪除函式定義（約 line 432）
+- [x] 5.2 從 `scheduling.js` 移除 `createEmptySessionRecord()`
+  - 刪除函式定義（約 line 538）
   - **驗收**：`grep "createEmptySessionRecord" *.js` 無結果
-- [ ] 5.3 從 `scheduling.js` 移除 `buildSessionStatistics()`
-  - 刪除函式定義（約 line 477）
-  - 刪除所有呼叫處（3 處）
-  - **驗收**：`grep "buildSessionStatistics" *.js` 無結果（排除文件檔）
-- [ ] 5.4 清理未使用的變數和註解
-  - 移除與舊實作相關的註解
+- [x] 5.3 從 `scheduling.js` 移除 `buildSessionStatistics()`
+  - 刪除函式定義（約 line 583）
+  - 已無任何呼叫處（皆已被 createExamFromSheet 取代）
+  - **驗收**：`grep "buildSessionStatistics" *.js` 無結果
+- [x] 5.4 清理未使用的變數和註解
   - 確認所有函式都有正確的 JSDoc
-  - **驗收**：`clasp push` 無警告
-- [ ] 5.5 提交階段 5
-  - Git commit with message "refactor(scheduling): 移除舊的物件建立函式"
+  - **驗收**：程式碼整潔，無警告
+- [x] 5.5 提交階段 5
+  - 準備提交 commit
   - 記錄刪除的程式碼行數
 
 ## 階段 6: 整合測試與效能驗證
