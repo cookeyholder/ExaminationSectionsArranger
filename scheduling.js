@@ -1,169 +1,197 @@
+/**
+ * 安排共同科目的節次（物理、國文、英文、數學等）
+ * 
+ * 根據「參數區」工作表中的科目-節次對映規則，
+ * 將共同科目分配到指定的節次。
+ */
 function scheduleCommonSubjectSessions(){
   const sessionRuleRows = PARAMETERS_SHEET.getRange(2, 5, 21, 2).getValues();
-  const [headerRow, ...candidateRows] = FILTERED_RESULT_SHEET.getDataRange().getValues();
-  const subjectNameIndex = headerRow.indexOf("科目名稱");
-  const sessionIndex = headerRow.indexOf("節次");
+  const exam = createExamFromSheet();
+  const columns = getColumnIndices();
 
+  // 建立科目到節次的對映
   const preferredSessionBySubject = {};
-  sessionRuleRows.forEach(
-    function(ruleRow){
-      if (ruleRow[0] && ruleRow[1]){
-        preferredSessionBySubject[ruleRow[0]] = ruleRow[1];
-      }
+  sessionRuleRows.forEach(function(ruleRow){
+    if (ruleRow[0] && ruleRow[1]){
+      preferredSessionBySubject[ruleRow[0]] = ruleRow[1];
     }
-  );
+  });
 
-  const updatedRows = candidateRows.map(
-    function(examineeRow){
-      const preferredSession = preferredSessionBySubject[examineeRow[subjectNameIndex]];
-      if (preferredSession == null){
-        return examineeRow;
+  // 重新分配共同科目的節次
+  exam.sessions.forEach(function(session){
+    session.students.forEach(function(student){
+      const subjectName = student[columns.subject];
+      const preferredSession = preferredSessionBySubject[subjectName];
+      if (preferredSession != null){
+        student[columns.session] = preferredSession;
       }
-      examineeRow[sessionIndex] = preferredSession;
-      return examineeRow;
-    }
-  );
+    });
+  });
 
-  if(updatedRows.length === candidateRows.length){
-    writeRangeValuesSafely(FILTERED_RESULT_SHEET.getRange(2, 1, updatedRows.length, updatedRows[0].length), updatedRows);
-  } else {
-    Logger.log("安排共同科目節次時，合併後的資料筆數和原有的筆數不同！");
-    SpreadsheetApp.getUi().alert("安排共同科目節次時，合併後的資料筆數和原有的筆數不同！");
-  }
+  // 儲存更新後的資料
+  saveExamToSheet(exam);
 }
 
 
+/**
+ * 安排專業科目的節次
+ * 
+ * 根據科別年級互斥規則和節次容量限制，
+ * 將專業科目分配到適當的節次。
+ */
 function scheduleSpecializedSubjectSessions(){
-  const [headerRow, ...candidateRows] = FILTERED_RESULT_SHEET.getDataRange().getValues();
-  const sessionIndex = headerRow.indexOf("節次");
-
+  const exam = createExamFromSheet();
+  const columns = getColumnIndices();
   const maxSessionCount = PARAMETERS_SHEET.getRange("B5").getValue();
   const sessionCapacity = 0.9 * PARAMETERS_SHEET.getRange("B9").getValue();
 
-  const departmentGradeSubjectCounts = Object.entries(fetchDepartmentGradeSubjectCounts()).sort(compareCountDescending);
-  const sessionSnapshots = buildSessionStatistics();
+  const departmentGradeSubjectCounts = Object.entries(
+    fetchDepartmentGradeSubjectCounts()
+  ).sort(compareCountDescending);
 
-  for(let sessionNumber = 1; sessionNumber < maxSessionCount + 2; sessionNumber++){
-    for(let countIndex = 0; countIndex < departmentGradeSubjectCounts.length; countIndex++){
-      const departmentGradeKey = departmentGradeSubjectCounts[countIndex][0].slice(0, departmentGradeSubjectCounts[countIndex][0].indexOf("_"));
-      const isDepartmentScheduled = Object.keys(sessionSnapshots[sessionNumber].departmentGradeStatistics).includes(departmentGradeKey);
-      if(isDepartmentScheduled){
+  // 清空所有節次（重新分配）
+  exam.sessions.forEach(function(session){ 
+    session.clear(); 
+  });
+  
+  // 收集所有未分配節次的學生
+  const allStudents = [];
+  exam.sessions[0].students.forEach(function(student){
+    if (student[columns.session] === 0) {
+      allStudents.push(student);
+    }
+  });
+
+  // 為每個節次分配學生
+  for (let sessionNumber = 1; sessionNumber <= maxSessionCount; sessionNumber++) {
+    const session = exam.sessions[sessionNumber];
+    
+    for (let countIndex = 0; countIndex < departmentGradeSubjectCounts.length; countIndex++) {
+      const [deptGradeSubjectKey, studentCount] = departmentGradeSubjectCounts[countIndex];
+      const deptGradeKey = deptGradeSubjectKey.substring(0, deptGradeSubjectKey.indexOf("_"));
+
+      // 檢查該科別年級是否已排入此節次（互斥規則）
+      const deptGradeStats = session.departmentGradeStatistics;
+      if (Object.keys(deptGradeStats).includes(deptGradeKey)) {
         continue;
       }
 
-      const hasCapacity = departmentGradeSubjectCounts[countIndex][1] + sessionSnapshots[sessionNumber].population <= sessionCapacity;
-      if(!hasCapacity){
+      // 檢查容量
+      if (studentCount + session.population > sessionCapacity) {
         continue;
       }
 
-      if(sessionSnapshots[sessionNumber].population >= sessionCapacity){
-        Logger.log("第" + sessionNumber + "節已達人數上限。");
-        Logger.log("學生數為： " + sessionSnapshots[sessionNumber].population);
-        break;
-      }
-
-      candidateRows.forEach(
-        function(examineeRow){
-          const departmentGradeSubjectKey = examineeRow[0] + examineeRow[1] + "_" + examineeRow[7];
-          if(departmentGradeSubjectKey === departmentGradeSubjectCounts[countIndex][0] && examineeRow[8] === 0){
-            examineeRow[sessionIndex] = sessionNumber;
-            sessionSnapshots[sessionNumber].students.push(examineeRow);
-          }
+      // 分配學生到此節次
+      allStudents.forEach(function(student){
+        const studentKey = student[columns.department] + student[columns.grade] + "_" + student[columns.subject];
+        if (studentKey === deptGradeSubjectKey && student[columns.session] === 0) {
+          student[columns.session] = sessionNumber;
+          session.addStudent(student);
         }
-      );
+      });
+    }
+
+    if (session.population >= sessionCapacity) {
+      Logger.log("第" + sessionNumber + "節已達人數上限：" + session.population);
     }
   }
 
-  let combinedRows = [];
-  for(let sessionNumber = 1; sessionNumber < maxSessionCount + 2; sessionNumber++){
-    Logger.log("sessions[" + sessionNumber + "]: " + sessionSnapshots[sessionNumber].population);
-    combinedRows = combinedRows.concat(sessionSnapshots[sessionNumber].students);
+  // 檢查是否所有學生都已分配
+  const unscheduledCount = allStudents.filter(function(s){ 
+    return s[columns.session] === 0; 
+  }).length;
+  
+  if (unscheduledCount > 0) {
+    Logger.log("無法將所有人排入 " + maxSessionCount + " 節，請檢查是否有某科年級須補考過多科目！");
+    SpreadsheetApp.getUi().alert("無法將所有人排入 " + maxSessionCount + " 節，請檢查是否有某科年級須補考過多科目！");
   }
-    
-  if(combinedRows.length === candidateRows.length){
-    writeRangeValuesSafely(FILTERED_RESULT_SHEET.getRange(2, 1, combinedRows.length, combinedRows[0].length), combinedRows);
-  } else {
-    Logger.log("無法將所有人排入 " + maxSessionCount + " 節，請檢查是否有某科年級須補考 " + parseInt(maxSessionCount + 1) +" 科以上！");
-    SpreadsheetApp.getUi().alert("無法將所有人排入 " + maxSessionCount + "節，請檢查是否有某科年級須補考 10 科以上！");
-  }
+
+  saveExamToSheet(exam);
 }
 
 
+/**
+ * 安排試場
+ * 
+ * 根據班級科目統計和試場容量限制，
+ * 將學生分配到試場。
+ */
 function assignExamRooms(){
-  const [headerRow, ...candidateRows] = FILTERED_RESULT_SHEET.getDataRange().getValues();
-  const classIndex = headerRow.indexOf("班級");
-  const subjectIndex = headerRow.indexOf("科目名稱");
-  const roomIndex = headerRow.indexOf("試場");
-
+  const exam = createExamFromSheet();
+  const columns = getColumnIndices();
   const maxSessionCount = PARAMETERS_SHEET.getRange("B5").getValue();
   const maxRoomCount = PARAMETERS_SHEET.getRange("B6").getValue();
   const maxStudentsPerRoom = PARAMETERS_SHEET.getRange("B7").getValue();
   const maxSubjectsPerRoom = PARAMETERS_SHEET.getRange("B8").getValue();
 
-  const sessionSnapshots = buildSessionStatistics();
+  for (let sessionNumber = 1; sessionNumber <= maxSessionCount; sessionNumber++) {
+    const session = exam.sessions[sessionNumber];
+    
+    // 清空所有試場
+    session.classrooms.forEach(function(classroom){ 
+      classroom.clear(); 
+    });
 
-  for(let sessionNumber = 1; sessionNumber < maxSessionCount + 2; sessionNumber++){
-    let totalStudentsWithinSession = 0;
-    const departmentSubjectCounts = Object.entries(sessionSnapshots[sessionNumber].departmentClassSubjectStatistics).sort(compareCountDescending);
-    for(let roomNumber = 1; roomNumber < sessionSnapshots[sessionNumber].classrooms.length; roomNumber++){
+    const deptClassSubjectCounts = Object.entries(
+      session.departmentClassSubjectStatistics
+    ).sort(compareCountDescending);
+
+    for (let roomNumber = 1; roomNumber <= maxRoomCount; roomNumber++) {
+      const classroom = session.classrooms[roomNumber];
       let scheduledSubjects = [];
-      for(let countIndex = 0; countIndex < departmentSubjectCounts.length; countIndex++){
-        const isSubjectScheduled = scheduledSubjects.includes(departmentSubjectCounts[countIndex][0]);
-        if(isSubjectScheduled){
+
+      for (let countIndex = 0; countIndex < deptClassSubjectCounts.length; countIndex++) {
+        const [classSubjectKey, count] = deptClassSubjectCounts[countIndex];
+
+        // 檢查是否已排入
+        if (scheduledSubjects.includes(classSubjectKey)) {
           continue;
         }
 
-        const roomHasCapacity = departmentSubjectCounts[countIndex][1] + sessionSnapshots[sessionNumber].classrooms[roomNumber].population <= maxStudentsPerRoom;
-        if(!roomHasCapacity){
+        // 檢查容量
+        if (count + classroom.population > maxStudentsPerRoom) {
           continue;
         }
 
-        const subjectCountWithinRoom = Object.keys(sessionSnapshots[sessionNumber].classrooms[roomNumber].classSubjectStatistics).length;
-        const underSubjectLimit = 1 + subjectCountWithinRoom <= maxSubjectsPerRoom;
-        if(!underSubjectLimit){
+        // 檢查科目數限制
+        const subjectCount = Object.keys(classroom.classSubjectStatistics).length;
+        if (subjectCount + 1 > maxSubjectsPerRoom) {
           continue;
         }
 
-        if(sessionSnapshots[sessionNumber].classrooms[roomNumber].population >= maxStudentsPerRoom){
-          break;
-        }
-
-        sessionSnapshots[sessionNumber].students.forEach(
-          function(examineeRow){
-            const subjectKey = examineeRow[classIndex] + examineeRow[subjectIndex];
-            if(subjectKey === departmentSubjectCounts[countIndex][0] && examineeRow[roomIndex] === 0){
-              examineeRow[roomIndex] = roomNumber;
-              sessionSnapshots[sessionNumber].classrooms[roomNumber].students.push(examineeRow);
-            }
+        // 分配學生到此試場
+        session.students.forEach(function(student){
+          const studentKey = student[columns.class] + student[columns.subject];
+          if (studentKey === classSubjectKey && student[columns.room] === 0) {
+            student[columns.room] = roomNumber;
+            classroom.addStudent(student);
           }
-        );
+        });
 
-        scheduledSubjects = scheduledSubjects.concat(Object.keys(sessionSnapshots[sessionNumber].classrooms[roomNumber].classSubjectStatistics));
+        scheduledSubjects = Object.keys(classroom.classSubjectStatistics);
       }
-      totalStudentsWithinSession += sessionSnapshots[sessionNumber].classrooms[roomNumber].population;
-    }
-
-    if(sessionSnapshots[sessionNumber].population !== totalStudentsWithinSession){
-      break;
     }
   }
 
-  let reorderedRows = [];
-  for(let sessionNumber = 1; sessionNumber < maxSessionCount + 2; sessionNumber++){
-    for(let roomNumber = 1; roomNumber < sessionSnapshots[sessionNumber].classrooms.length; roomNumber++){
-      reorderedRows = reorderedRows.concat(sessionSnapshots[sessionNumber].classrooms[roomNumber].students);
-    }
-  }
+  // 檢查是否所有學生都已分配試場
+  let allScheduled = true;
+  exam.sessions.forEach(function(session){
+    session.students.forEach(function(student){
+      if (student[columns.room] === 0) {
+        allScheduled = false;
+      }
+    });
+  });
 
-  if(reorderedRows.length === candidateRows.length){
-    writeRangeValuesSafely(FILTERED_RESULT_SHEET.getRange(2, 1, reorderedRows.length, reorderedRows[0].length), reorderedRows);
-  } else {
+  if (!allScheduled) {
     Logger.log("現有試場數無法容納所有補考學生，請增加試場數或調整每間試場人數上限！");
     SpreadsheetApp.getUi().alert("現有試場數無法容納所有補考學生，請增加試場數或調整每間試場人數上限！");
   }
 
-  const sessionSnapshotsForAlert = buildSessionStatistics();
-  if (sessionSnapshotsForAlert[9].students.length > 0){
+  saveExamToSheet(exam);
+
+  // 檢查是否有學生被安排在第 9 節
+  if (exam.sessions[9] && exam.sessions[9].population > 0) {
     SpreadsheetApp.getUi().alert("部分考生被安排在第9節補考，請注意是否需要調整到中午應試！");
   }
 

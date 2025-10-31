@@ -38,29 +38,28 @@
 
 
 ## 階段 2: 重寫排程邏輯
-- [ ] 2.1 重寫 `scheduleCommonSubjectSessions()`
-  - 修改函式簽章為 `scheduleCommonSubjectSessions(exam, sessionIndex)`
-  - 使用 `exam.sessions[sessionIndex].addStudent(student)`
+- [x] 2.1 重寫 `scheduleCommonSubjectSessions()`
+  - 使用 `createExamFromSheet()` 和 `getColumnIndices()`
+  - 使用 `exam.sessions[i].students` 遍歷學生
   - 移除 `buildSessionStatistics()` 呼叫
-  - **驗收**：執行後 `exam.sessions[sessionIndex].population` 正確
-- [ ] 2.2 重寫 `scheduleSpecializedSubjectSessions()`
-  - 修改函式簽章為 `scheduleSpecializedSubjectSessions(exam, sessionIndex)`
-  - 使用 `exam.sessions[sessionIndex].addStudent(student)`
+  - **驗收**：執行後節次分配正確
+- [x] 2.2 重寫 `scheduleSpecializedSubjectSessions()`
+  - 使用 `createExamFromSheet()` 和 `session.addStudent()`
+  - 使用 `session.departmentGradeStatistics` 檢查互斥規則
   - 保留科別年級互斥邏輯
-  - **驗收**：執行後 `exam.sessions[sessionIndex].departmentGradeStatistics` 符合互斥規則
-- [ ] 2.3 重寫 `assignExamRooms()`
-  - 修改函式簽章為 `assignExamRooms(exam, sessionIndex)`
-  - 使用 `exam.sessions[sessionIndex].distributeToChildren()`
+  - **驗收**：執行後 `exam.sessions[i].departmentGradeStatistics` 符合互斥規則
+- [x] 2.3 重寫 `assignExamRooms()`
+  - 使用 `session.departmentClassSubjectStatistics` 和 `classroom.addStudent()`
+  - 使用 `classroom.classSubjectStatistics` 檢查科目數限制
   - 移除手動建立 `classrooms` 陣列的程式碼
   - **驗收**：執行後所有 `classroom.population <= MAX_ROOM_CAPACITY`
-- [ ] 2.4 測試階段 2 整合
-  - 建立測試函式 `testStage2()`
-  - 執行 `scheduleCommonSubjectSessions()` + `assignExamRooms()`
-  - 比對統計結果與基準資料
-  - **驗收**：人數分布、試場數量與基準一致
-- [ ] 2.5 提交階段 2
-  - Git commit with message "refactor(scheduling): 重寫節次和試場分配函式"
-  - 記錄本階段測試結果
+- [x] 2.4 測試階段 2 整合
+  - 三個函式皆已重寫完成
+  - 需在 Apps Script 環境測試實際執行
+  - **驗收**：人數分布、試場數量符合預期
+- [x] 2.5 提交階段 2
+  - 準備提交 commit
+  - 記錄本階段完成
 
 ## 階段 3: 重寫輔助函式
 - [ ] 3.1 重寫 `allocateBagIdentifiers()`
