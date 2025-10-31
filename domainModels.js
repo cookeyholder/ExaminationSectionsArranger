@@ -39,10 +39,13 @@ function createStatisticsContainer(config = {}) {
         /**
          * 通用統計方法 - 根據指定的維度名稱產生統計
          * @param {string} dimensionName - 統計維度名稱
-         * @returns {Object} 統計結果物件
+         * @returns {Object} 統計結果物件，每個 key 對應一個物件 { count, students }
          * @example
          * session.statistics('departmentGradeStatistics')
-         * // 返回 {"資訊三": 10, "機械二": 8}
+         * // 返回 {
+         * //   "資訊三": { count: 10, students: [...] },
+         * //   "機械二": { count: 8, students: [...] }
+         * // }
          */
         statistics(dimensionName) {
             const keyGenerator = dimensionsMap[dimensionName];
@@ -57,7 +60,11 @@ function createStatisticsContainer(config = {}) {
             const stats = {};
             this.students.forEach((studentRow) => {
                 const key = keyGenerator(studentRow);
-                stats[key] = (stats[key] || 0) + 1;
+                if (!stats[key]) {
+                    stats[key] = { count: 0, students: [] };
+                }
+                stats[key].count++;
+                stats[key].students.push(studentRow);
             });
             return stats;
         },
@@ -245,6 +252,12 @@ function createExamRecord(maxSessionCount, maxRoomCount) {
     // 初始化節次（索引 0 不使用，從 1 開始）
     if (maxSessionCount !== undefined) {
         exam.initializeChildren(maxSessionCount + 2);
+    }
+
+    if (maxRoomCount !== undefined) {
+        exam.sessions.forEach((session) => {
+            session.initializeChildren(maxRoomCount + 1);
+        });
     }
 
     return exam;
