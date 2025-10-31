@@ -1,56 +1,205 @@
-## 1. 建立核心服務層
+## 階段 0: 準備基準測試資料
+- [ ] 0.1 建立試算表測試副本
+  - 複製正式環境的試算表
+  - 重新命名為「補考編排系統_測試_YYYYMMDD」
+  - 確保所有工作表都已複製
+- [ ] 0.2 執行現有流程並記錄基準
+  - 執行「步驟 1. 產出公告用補考名單、試場記錄表」
+  - 匯出「排入考程的補考名單」為 CSV（baseline_scheduled.csv）
+  - 匯出「公告版補考場次」為 CSV（baseline_bulletin.csv）
+  - 匯出「試場記錄表」為 CSV（baseline_classrooms.csv）
+  - 記錄執行時間到 benchmark.txt
+- [ ] 0.3 建立基準驗證腳本（optional）
+  - 撰寫 compare.sh 比對 CSV 檔案
+  - 或使用試算表的 COUNTIF 公式驗證人數
+
+## 階段 1: 建立核心服務層
 - [ ] 1.1 建立 `examService.js` 檔案
-- [ ] 1.2 實作 `createExamFromSheet()` 函式
-- [ ] 1.3 實作 `saveExamToSheet()` 函式
-- [ ] 1.4 實作 `getColumnIndices()` 函式
-- [ ] 1.5 更新 `appsscript.json` 確保檔案載入順序正確
+  - 在專案根目錄建立檔案
+  - 加入檔案標頭註解（用途說明）
+  - **驗收**：檔案存在且包含正確的 JSDoc 註解
+- [ ] 1.2 實作 `getColumnIndices()` 函式
+  - 回傳物件包含所有欄位對映（department, grade, class, seat, ...）
+  - 使用 `EXAM_STUDENT_LIST_SHEET` 的標題列
+  - **驗收**：執行 `Logger.log(getColumnIndices())` 顯示正確對映
+- [ ] 1.3 實作 `createExamFromSheet()` 函式
+  - 讀取「排入考程的補考名單」工作表
+  - 建立 `createExamRecord(maxSessions, maxRooms)`
+  - 根據節次欄填充 `exam.sessions[i].students`
+  - **驗收**：`exam.population` 等於工作表總列數 - 1
+- [ ] 1.4 實作 `saveExamToSheet(exam)` 函式
+  - 清空目標工作表（保留標題列）
+  - 從 `classroom.students` 聚合資料
+  - 寫入工作表，按節次和試場排序
+  - **驗收**：執行 `saveExamToSheet(createExamFromSheet())` 後工作表內容不變
+- [ ] 1.5 更新 `appsscript.json` 確保檔案載入順序
+  - 若需要重新命名檔案以控制載入順序，記錄在 PR 說明中
+  - **驗收**：`clasp push` 無錯誤，Apps Script 編輯器中檔案順序正確
 
-## 2. 重寫排程邏輯
+
+## 階段 2: 重寫排程邏輯
 - [ ] 2.1 重寫 `scheduleCommonSubjectSessions()`
+  - 修改函式簽章為 `scheduleCommonSubjectSessions(exam, sessionIndex)`
+  - 使用 `exam.sessions[sessionIndex].addStudent(student)`
+  - 移除 `buildSessionStatistics()` 呼叫
+  - **驗收**：執行後 `exam.sessions[sessionIndex].population` 正確
 - [ ] 2.2 重寫 `scheduleSpecializedSubjectSessions()`
+  - 修改函式簽章為 `scheduleSpecializedSubjectSessions(exam, sessionIndex)`
+  - 使用 `exam.sessions[sessionIndex].addStudent(student)`
+  - 保留科別年級互斥邏輯
+  - **驗收**：執行後 `exam.sessions[sessionIndex].departmentGradeStatistics` 符合互斥規則
 - [ ] 2.3 重寫 `assignExamRooms()`
-- [ ] 2.4 測試節次分配功能
-- [ ] 2.5 測試試場分配功能
+  - 修改函式簽章為 `assignExamRooms(exam, sessionIndex)`
+  - 使用 `exam.sessions[sessionIndex].distributeToChildren()`
+  - 移除手動建立 `classrooms` 陣列的程式碼
+  - **驗收**：執行後所有 `classroom.population <= MAX_ROOM_CAPACITY`
+- [ ] 2.4 測試階段 2 整合
+  - 建立測試函式 `testStage2()`
+  - 執行 `scheduleCommonSubjectSessions()` + `assignExamRooms()`
+  - 比對統計結果與基準資料
+  - **驗收**：人數分布、試場數量與基準一致
+- [ ] 2.5 提交階段 2
+  - Git commit with message "refactor(scheduling): 重寫節次和試場分配函式"
+  - 記錄本階段測試結果
 
-## 3. 重寫輔助函式
+## 階段 3: 重寫輔助函式
 - [ ] 3.1 重寫 `allocateBagIdentifiers()`
+  - 修改函式簽章為 `allocateBagIdentifiers(exam)`
+  - 遍歷 `exam.sessions[i].classrooms[j].students`
+  - 使用 `classroom.classSubjectStatistics` 計算班級人數
+  - **驗收**：大袋、小袋編號連續且無重複
 - [ ] 3.2 重寫 `populateSessionTimes()`
+  - 修改函式簽章為 `populateSessionTimes(exam)`
+  - 遍歷 `exam.sessions[i].classrooms[j].students`
+  - 填充節次時間到每個學生陣列
+  - **驗收**：所有學生的節次時間欄位已填充
 - [ ] 3.3 重寫 `updateBagAndClassPopulations()`
-- [ ] 3.4 測試編號計算正確性
-- [ ] 3.5 測試時間填充正確性
+  - 修改函式簽章為 `updateBagAndClassPopulations(exam)`
+  - 使用 `classroom.classSubjectStatistics` 更新人數
+  - **驗收**：「小袋總人數」和「班級人數」欄位正確
+- [ ] 3.4 測試階段 3 整合
+  - 建立測試函式 `testStage3()`
+  - 執行完整流程到 `saveExamToSheet()`
+  - 匯出為 CSV 與基準比對
+  - **驗收**：輸出與 baseline_scheduled.csv 一致
+- [ ] 3.5 提交階段 3
+  - Git commit with message "refactor(scheduling): 重寫輔助函式"
+  - 記錄本階段測試結果
 
-## 4. 重寫排序函式
+## 階段 4: 重寫排序函式
 - [ ] 4.1 重寫 `sortFilteredStudentsBySubject()`
+  - 修改函式簽章為 `sortFilteredStudentsBySubject(exam)`
+  - 遍歷 `exam.sessions[i].classrooms[j].students` 並排序
+  - **驗收**：每個試場內學生按科目排序
 - [ ] 4.2 重寫 `sortFilteredStudentsByClassSeat()`
+  - 修改函式簽章為 `sortFilteredStudentsByClassSeat(exam)`
+  - 遍歷 `exam.sessions[i].classrooms[j].students` 並排序
+  - **驗收**：每個試場內學生按班級、座號排序
 - [ ] 4.3 重寫 `sortFilteredStudentsBySessionRoom()`
-- [ ] 4.4 測試所有排序功能
+  - 修改函式簽章為 `sortFilteredStudentsBySessionRoom(exam)`
+  - 遍歷所有 `classroom.students` 並全域排序
+  - **驗收**：工作表內學生按節次、試場排序
+- [ ] 4.4 測試階段 4 整合
+  - 執行「步驟 1」完整流程
+  - 比對「公告版補考場次」與 baseline_bulletin.csv
+  - 比對「試場記錄表」與 baseline_classrooms.csv
+  - **驗收**：所有輸出與基準一致
+- [ ] 4.5 提交階段 4
+  - Git commit with message "refactor(scheduling): 重寫排序函式"
+  - 記錄本階段測試結果
 
-## 5. 清理舊程式碼
+## 階段 5: 清理舊程式碼
 - [ ] 5.1 從 `scheduling.js` 移除 `createEmptyClassroomRecord()`
+  - 刪除函式定義（約 line 410）
+  - **驗收**：`grep "createEmptyClassroomRecord" *.js` 無結果
 - [ ] 5.2 從 `scheduling.js` 移除 `createEmptySessionRecord()`
+  - 刪除函式定義（約 line 432）
+  - **驗收**：`grep "createEmptySessionRecord" *.js` 無結果
 - [ ] 5.3 從 `scheduling.js` 移除 `buildSessionStatistics()`
-- [ ] 5.4 使用 grep 確認沒有遺留引用
-- [ ] 5.5 清理未使用的匯入和註解
+  - 刪除函式定義（約 line 477）
+  - 刪除所有呼叫處（3 處）
+  - **驗收**：`grep "buildSessionStatistics" *.js` 無結果（排除文件檔）
+- [ ] 5.4 清理未使用的變數和註解
+  - 移除與舊實作相關的註解
+  - 確認所有函式都有正確的 JSDoc
+  - **驗收**：`clasp push` 無警告
+- [ ] 5.5 提交階段 5
+  - Git commit with message "refactor(scheduling): 移除舊的物件建立函式"
+  - 記錄刪除的程式碼行數
 
-## 6. 整合測試
+## 階段 6: 整合測試與效能驗證
 - [ ] 6.1 執行「步驟 1. 產出公告用補考名單、試場記錄表」
+  - 在測試副本上執行
+  - 記錄執行時間（開始、結束時間戳）
+  - **驗收**：流程無錯誤，所有工作表已更新
 - [ ] 6.2 驗證「排入考程的補考名單」工作表
+  - 匯出為 test_scheduled.csv
+  - 使用 `diff` 或試算表公式比對
+  - **驗收**：與 baseline_scheduled.csv 完全一致
 - [ ] 6.3 驗證「公告版補考場次」工作表
+  - 匯出為 test_bulletin.csv
+  - 比對欄位：科目、時間、節次、試場、座位
+  - **驗收**：與 baseline_bulletin.csv 完全一致
 - [ ] 6.4 驗證「試場記錄表」工作表
+  - 匯出為 test_classrooms.csv
+  - 比對欄位：節次、試場、學生清單
+  - **驗收**：與 baseline_classrooms.csv 完全一致
 - [ ] 6.5 執行「步驟 2. 合併列印小袋封面」
+  - 產生 PDF 檔案
+  - 開啟檢查封面資訊正確性
+  - **驗收**：PDF 內容與重構前相同
 - [ ] 6.6 執行「步驟 3. 合併列印大袋封面」
-- [ ] 6.7 比對重構前後的輸出結果
-- [ ] 6.8 記錄執行時間差異
+  - 產生 PDF 檔案
+  - 開啟檢查封面資訊正確性
+  - **驗收**：PDF 內容與重構前相同
+- [ ] 6.7 效能驗證
+  - 比較執行時間與基準
+  - 計算差異百分比
+  - **驗收**：執行時間差異在 ±10% 內
+- [ ] 6.8 重複測試
+  - 重新執行步驟 6.1-6.7 共 3 次
+  - **驗收**：3 次結果皆一致
 
-## 7. 文件更新
-- [ ] 7.1 更新 `AGENTS.md` 領域模型章節（已完成）
-- [ ] 7.2 更新 `REFACTORING_PLAN.md`（已完成）
-- [ ] 7.3 建立 OpenSpec 規範文件
-- [ ] 7.4 撰寫遷移指南
+## 階段 7: 文件更新
+- [ ] 7.1 更新 `AGENTS.md` 領域模型章節
+  - ✅ 已完成（已包含 Domain Models 說明）
+- [ ] 7.2 更新 `REFACTORING_PLAN.md` 狀態
+  - 標記所有階段為「已完成」
+  - 加入實際執行心得
+  - **驗收**：文件反映最新狀態
+- [ ] 7.3 建立遷移指南（optional）
+  - 若有其他開發者，撰寫 MIGRATION.md
+  - 說明新舊 API 對照
+  - **驗收**：文件清晰易懂
+- [ ] 7.4 更新 OpenSpec 規範
+  - 將 `changes/refactor-domain-models/specs/` 移動到 `specs/`
+  - 標記所有 requirements 為 CURRENT
+  - **驗收**：`openspec validate` 通過
 
-## 8. 部署準備
+## 階段 8: 部署準備
 - [ ] 8.1 在 `refactor/domain-models` 分支提交所有變更
+  - 確保所有檔案已 `git add`
+  - 撰寫完整的 commit message
+  - **驗收**：`git status` 顯示 clean working tree
 - [ ] 8.2 建立 Pull Request
-- [ ] 8.3 執行完整的手動測試
+  - 標題：「refactor: 重構排程系統使用統一領域模型」
+  - 內文：參考 REFACTORING_PLAN.md 和 design.md
+  - 附上測試結果截圖
+  - **驗收**：PR 描述完整，所有檢查項目通過
+- [ ] 8.3 最終手動測試
+  - 在 PR 建立後，再次執行完整流程
+  - 邀請使用者（註冊組）檢視輸出
+  - **驗收**：使用者確認輸出正確
 - [ ] 8.4 合併到 `master` 分支
-- [ ] 8.5 執行 `clasp push` 部署到正式環境
+  - 使用 squash merge 或 merge commit（依團隊慣例）
+  - 刪除 `refactor/domain-models` 分支
+  - **驗收**：master 分支包含所有變更
+- [ ] 8.5 部署到正式環境
+  - `git checkout master`
+  - `clasp push`
+  - 在正式試算表執行一次測試
+  - **驗收**：正式環境運作正常
+- [ ] 8.6 封存 OpenSpec 變更提案
+  - 將 `changes/refactor-domain-models/` 移至 `changes/archive/`
+  - 更新 `openspec list` 狀態
+  - **驗收**：`openspec list` 顯示 0 active changes
