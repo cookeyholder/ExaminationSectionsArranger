@@ -14,26 +14,26 @@
   - 或使用試算表的 COUNTIF 公式驗證人數
 
 ## 階段 1: 建立核心服務層
-- [ ] 1.1 建立 `examService.js` 檔案
+- [x] 1.1 建立 `examService.js` 檔案
   - 在專案根目錄建立檔案
   - 加入檔案標頭註解（用途說明）
   - **驗收**：檔案存在且包含正確的 JSDoc 註解
-- [ ] 1.2 實作 `getColumnIndices()` 函式
+- [x] 1.2 實作 `getColumnIndices()` 函式
   - 回傳物件包含所有欄位對映（department, grade, class, seat, ...）
-  - 使用 `EXAM_STUDENT_LIST_SHEET` 的標題列
+  - 使用 `FILTERED_RESULT_SHEET` 的標題列
   - **驗收**：執行 `Logger.log(getColumnIndices())` 顯示正確對映
-- [ ] 1.3 實作 `createExamFromSheet()` 函式
+- [x] 1.3 實作 `createExamFromSheet()` 函式
   - 讀取「排入考程的補考名單」工作表
   - 建立 `createExamRecord(maxSessions, maxRooms)`
   - 根據節次欄填充 `exam.sessions[i].students`
   - **驗收**：`exam.population` 等於工作表總列數 - 1
-- [ ] 1.4 實作 `saveExamToSheet(exam)` 函式
+- [x] 1.4 實作 `saveExamToSheet(exam)` 函式
   - 清空目標工作表（保留標題列）
   - 從 `classroom.students` 聚合資料
   - 寫入工作表，按節次和試場排序
   - **驗收**：執行 `saveExamToSheet(createExamFromSheet())` 後工作表內容不變
-- [ ] 1.5 更新 `appsscript.json` 確保檔案載入順序
-  - 若需要重新命名檔案以控制載入順序，記錄在 PR 說明中
+- [x] 1.5 更新 `appsscript.json` 確保檔案載入順序
+  - 檔案載入順序正確：domainModels.js → examService.js → scheduling.js
   - **驗收**：`clasp push` 無錯誤，Apps Script 編輯器中檔案順序正確
 
 
