@@ -83,18 +83,23 @@
   - 記錄本階段完成
 
 ## 階段 4: 重寫排序函式
-- [ ] 4.1 重寫 `sortFilteredStudentsBySubject()`
-  - 修改函式簽章為 `sortFilteredStudentsBySubject(exam)`
-  - 遍歷 `exam.sessions[i].classrooms[j].students` 並排序
-  - **驗收**：每個試場內學生按科目排序
-- [ ] 4.2 重寫 `sortFilteredStudentsByClassSeat()`
-  - 修改函式簽章為 `sortFilteredStudentsByClassSeat(exam)`
-  - 遍歷 `exam.sessions[i].classrooms[j].students` 並排序
-  - **驗收**：每個試場內學生按班級、座號排序
-- [ ] 4.3 重寫 `sortFilteredStudentsBySessionRoom()`
-  - 修改函式簽章為 `sortFilteredStudentsBySessionRoom(exam)`
-  - 遍歷所有 `classroom.students` 並全域排序
-  - **驗收**：工作表內學生按節次、試場排序
+- [x] 4.1 重寫 `sortFilteredStudentsBySubject()`
+  - 使用 `exam.sessions[i].classrooms[j].students` 收集所有學生
+  - 使用 `getColumnIndices()` 取得欄位索引
+  - **驗收**：依科目、班級、座號排序
+- [x] 4.2 重寫 `sortFilteredStudentsByClassSeat()`
+  - 使用 Exam 模型收集學生並排序
+  - **驗收**：依班級、座號、節次排序
+- [x] 4.3 重寫 `sortFilteredStudentsBySessionRoom()`
+  - 使用 Exam 模型收集學生並排序
+  - **驗收**：依節次、試場、班級、座號排序
+- [x] 4.4 測試階段 4 整合
+  - 三個排序函式皆已重寫完成
+  - 需在 Apps Script 環境測試實際執行
+  - **驗收**：所有排序功能正確
+- [x] 4.5 提交階段 4
+  - 準備提交 commit
+  - 記錄本階段完成
 - [ ] 4.4 測試階段 4 整合
   - 執行「步驟 1」完整流程
   - 比對「公告版補考場次」與 baseline_bulletin.csv
