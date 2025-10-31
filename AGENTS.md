@@ -122,7 +122,18 @@ saveExamToSheet(exam);
 
 ### 重構進度
 
-目前正在進行領域模型重構，詳見 `REFACTORING_PLAN.md`。重構完成後，所有排程邏輯將統一使用 Exam 模型，舊的 `createEmptySessionRecord()` 和 `createEmptyClassroomRecord()` 將被移除。
+✅ **領域模型重構已完成程式碼實作**（階段 1-5，25/52 任務）
+
+所有排程邏輯已統一使用 Exam 模型：
+- ✅ `examService.js` - 封裝 Exam 物件與工作表轉換
+- ✅ 所有排程函式已重寫使用 `createExamFromSheet()` 和 `saveExamToSheet()`
+- ✅ 舊函式已移除：`createEmptySessionRecord()`、`createEmptyClassroomRecord()`、`buildSessionStatistics()`
+
+詳見：
+- 實作計畫：[REFACTORING_PLAN.md](REFACTORING_PLAN.md)
+- OpenSpec 變更提案：[openspec/changes/refactor-domain-models/](openspec/changes/refactor-domain-models/)
+
+待完成：Apps Script 環境整合測試（階段 6）
 
 ## 建置、測試與開發指令
 開發流程採用 Apps Script CLI：先執行 `npm install -g @google/clasp` 完成安裝，之後以 `clasp login` 認證帳號；`clasp push` 上傳目前檔案至連結的腳本專案，`clasp pull` 則同步遠端變更。臨時驗證可在試算表中開啟 Apps Script 編輯器，但請確保最終變更回存到版本庫並透過 `clasp push` 部署。
