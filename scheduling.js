@@ -313,50 +313,143 @@ function updateBagAndClassPopulations() {
 }
 
 
+/**
+ * 依科目排序補考名單
+ * 
+ * 排序優先順序：科別 > 年級 > 節次 > 試場 > 科目 > 座號
+ */
 function sortFilteredStudentsBySubject(){
-  const filteredRange = FILTERED_RESULT_SHEET.getDataRange();
+  const exam = createExamFromSheet();
+  const columns = getColumnIndices();
+  
+  const allStudents = [];
+  exam.sessions.forEach(function(session){
+    session.classrooms.forEach(function(classroom){
+      allStudents.push(...classroom.students);
+    });
+  });
 
-  filteredRange.offset(1,0,filteredRange.getNumRows()-1).sort(
-    [
-      {column: 2, ascending: true}, 
-      {column: 3, ascending: true},
-      {column: 9, ascending: true},
-      {column: 10, ascending: true}, 
-      {column: 8, ascending: true}, 
-      {column: 5, ascending: true}      
-    ]
-  );
+  allStudents.sort(function(a, b){
+    // 優先依科別
+    if (a[columns.department] !== b[columns.department]) {
+      return a[columns.department].localeCompare(b[columns.department], 'zh-TW');
+    }
+    // 次依年級
+    if (a[columns.grade] !== b[columns.grade]) {
+      return a[columns.grade].localeCompare(b[columns.grade], 'zh-TW');
+    }
+    // 再依節次
+    if (a[columns.session] !== b[columns.session]) {
+      return a[columns.session] - b[columns.session];
+    }
+    // 再依試場
+    if (a[columns.room] !== b[columns.room]) {
+      return a[columns.room] - b[columns.room];
+    }
+    // 再依科目
+    if (a[columns.subject] !== b[columns.subject]) {
+      return a[columns.subject].localeCompare(b[columns.subject], 'zh-TW');
+    }
+    // 最後依座號
+    return a[columns.seatNumber] - b[columns.seatNumber];
+  });
+
+  // 直接寫回工作表
+  const [headerRow] = FILTERED_RESULT_SHEET.getDataRange().getValues();
+  FILTERED_RESULT_SHEET.getRange(2, 1, allStudents.length, allStudents[0].length)
+    .setValues(allStudents);
 }
 
 
+/**
+ * 依班級座號排序補考名單
+ * 
+ * 排序優先順序：科別 > 年級 > 座號 > 節次 > 科目
+ */
 function sortFilteredStudentsByClassSeat(){
-  const filteredRange = FILTERED_RESULT_SHEET.getDataRange();
+  const exam = createExamFromSheet();
+  const columns = getColumnIndices();
+  
+  const allStudents = [];
+  exam.sessions.forEach(function(session){
+    session.classrooms.forEach(function(classroom){
+      allStudents.push(...classroom.students);
+    });
+  });
 
-  filteredRange.offset(1,0,filteredRange.getNumRows()-1).sort(
-    [
-      {column: 2, ascending: true}, 
-      {column: 3, ascending: true}, 
-      {column: 5, ascending: true}, 
-      {column: 9, ascending: true}, 
-      {column: 8, ascending: true}
-    ]
-  );
+  allStudents.sort(function(a, b){
+    // 優先依科別
+    if (a[columns.department] !== b[columns.department]) {
+      return a[columns.department].localeCompare(b[columns.department], 'zh-TW');
+    }
+    // 次依年級
+    if (a[columns.grade] !== b[columns.grade]) {
+      return a[columns.grade].localeCompare(b[columns.grade], 'zh-TW');
+    }
+    // 再依座號
+    if (a[columns.seatNumber] !== b[columns.seatNumber]) {
+      return a[columns.seatNumber] - b[columns.seatNumber];
+    }
+    // 再依節次
+    if (a[columns.session] !== b[columns.session]) {
+      return a[columns.session] - b[columns.session];
+    }
+    // 最後依科目
+    return a[columns.subject].localeCompare(b[columns.subject], 'zh-TW');
+  });
+
+  // 直接寫回工作表
+  const [headerRow] = FILTERED_RESULT_SHEET.getDataRange().getValues();
+  FILTERED_RESULT_SHEET.getRange(2, 1, allStudents.length, allStudents[0].length)
+    .setValues(allStudents);
 }
 
 
+/**
+ * 依節次試場排序補考名單
+ * 
+ * 排序優先順序：節次 > 試場 > 科別 > 年級 > 座號 > 科目
+ */
 function sortFilteredStudentsBySessionRoom(){
-  const filteredRange = FILTERED_RESULT_SHEET.getDataRange();
+  const exam = createExamFromSheet();
+  const columns = getColumnIndices();
+  
+  const allStudents = [];
+  exam.sessions.forEach(function(session){
+    session.classrooms.forEach(function(classroom){
+      allStudents.push(...classroom.students);
+    });
+  });
 
-  filteredRange.offset(1,0,filteredRange.getNumRows()-1).sort(
-    [
-      {column: 9, ascending: true},
-      {column: 10, ascending: true},
-      {column: 2, ascending: true},
-      {column: 3, ascending: true},
-      {column: 5, ascending: true},
-      {column: 8, ascending: true},
-    ]
-  );
+  allStudents.sort(function(a, b){
+    // 優先依節次
+    if (a[columns.session] !== b[columns.session]) {
+      return a[columns.session] - b[columns.session];
+    }
+    // 次依試場
+    if (a[columns.room] !== b[columns.room]) {
+      return a[columns.room] - b[columns.room];
+    }
+    // 再依科別
+    if (a[columns.department] !== b[columns.department]) {
+      return a[columns.department].localeCompare(b[columns.department], 'zh-TW');
+    }
+    // 再依年級
+    if (a[columns.grade] !== b[columns.grade]) {
+      return a[columns.grade].localeCompare(b[columns.grade], 'zh-TW');
+    }
+    // 再依座號
+    if (a[columns.seatNumber] !== b[columns.seatNumber]) {
+      return a[columns.seatNumber] - b[columns.seatNumber];
+    }
+    // 最後依科目
+    return a[columns.subject].localeCompare(b[columns.subject], 'zh-TW');
+  });
+
+  // 直接寫回工作表
+  const [headerRow] = FILTERED_RESULT_SHEET.getDataRange().getValues();
+  FILTERED_RESULT_SHEET.getRange(2, 1, allStudents.length, allStudents[0].length)
+    .setValues(allStudents);
 }
 
 
