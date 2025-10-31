@@ -200,131 +200,116 @@ function assignExamRooms(){
 }
 
 
+/**
+ * 計算大、小袋編號
+ * 
+ * 遍歷所有試場的學生，為每個試場和班級科目組合分配唯一的編號。
+ */
 function allocateBagIdentifiers() {
   sortFilteredStudentsBySessionRoom();
 
-  const [headerRow, ...candidateRows] = FILTERED_RESULT_SHEET.getDataRange().getValues();
-  const classIndex = headerRow.indexOf("班級");
-  const subjectIndex = headerRow.indexOf("科目名稱");
-  const sessionIndex = headerRow.indexOf("節次");
-  const roomIndex = headerRow.indexOf("試場");
-  const smallBagIndex = headerRow.indexOf("小袋序號");
-  const bigBagIndex = headerRow.indexOf("大袋序號");
+  const exam = createExamFromSheet();
+  const columns = getColumnIndices();
+  
+  let smallBagCounter = 1;
+  let bigBagCounter = 1;
 
-  const smallBagLookup = {};
-  const bigBagLookup = {};
-  let nextSmallBagNumber = 0;
-  let nextBigBagNumber = 0;
-
-  candidateRows.forEach(
-    function(examineeRow){
-      const bigBagKey = examineeRow[sessionIndex] + "-" + examineeRow[roomIndex];
-      const smallBagKey = examineeRow[sessionIndex] + "-" + examineeRow[roomIndex] + "_" + examineeRow[classIndex] + "=" + examineeRow[subjectIndex];
-
-      if(!Object.keys(bigBagLookup).includes(bigBagKey)){
-        bigBagLookup[bigBagKey] = nextBigBagNumber + 1;
-        nextBigBagNumber += 1;
+  exam.sessions.forEach(function(session){
+    session.classrooms.forEach(function(classroom){
+      if (classroom.population > 0) {
+        // 為每個班級科目組合分配小袋序號
+        const classSubjectKeys = Object.keys(classroom.classSubjectStatistics);
+        const smallBagMapping = {};
+        
+        classSubjectKeys.forEach(function(key){
+          smallBagMapping[key] = smallBagCounter;
+          smallBagCounter++;
+        });
+        
+        // 設定小袋和大袋序號
+        classroom.students.forEach(function(student){
+          const classSubjectKey = student[columns.class] + student[columns.subject];
+          student[columns.smallBagId] = smallBagMapping[classSubjectKey];
+          student[columns.bigBagId] = bigBagCounter;
+        });
+        
+        bigBagCounter++;
       }
+    });
+  });
 
-      if(!Object.keys(smallBagLookup).includes(smallBagKey)){
-        smallBagLookup[smallBagKey] = nextSmallBagNumber + 1;
-        nextSmallBagNumber += 1;
-      }
-    }
-  );
-
-  candidateRows.forEach(
-    function(examineeRow){
-      const bigBagKey = examineeRow[sessionIndex] + "-" + examineeRow[roomIndex];
-      const smallBagKey = examineeRow[sessionIndex] + "-" + examineeRow[roomIndex] + "_" + examineeRow[classIndex] + "=" + examineeRow[subjectIndex];
-      examineeRow[bigBagIndex] = bigBagLookup[bigBagKey];
-      examineeRow[smallBagIndex] = smallBagLookup[smallBagKey];
-    }
-  );
-
-  writeRangeValuesSafely(FILTERED_RESULT_SHEET.getRange(2, 1, candidateRows.length, candidateRows[0].length), candidateRows);
+  saveExamToSheet(exam);
 }
 
 
+/**
+ * 填入節次時間
+ * 
+ * 根據「節次時間表」工作表的對映規則，
+ * 填充每個學生的節次時間欄位。
+ */
 function populateSessionTimes() {
-  const [headerRow, ...candidateRows] = FILTERED_RESULT_SHEET.getDataRange().getValues();
-  const sessionIndex = headerRow.indexOf("節次");
-  const timeIndex = headerRow.indexOf("時間");
-
+  const exam = createExamFromSheet();
+  const columns = getColumnIndices();
+  
   const [timeHeaders, ...sessionTimeRows] = SESSION_TIME_REFERENCE_SHEET.getDataRange().getValues();
 
   const sessionTimeLookup = {};
-  sessionTimeRows.forEach(
-    function(timeRow){
-      sessionTimeLookup[timeRow[0]] = timeRow[1];
-    }
-  );
+  sessionTimeRows.forEach(function(timeRow){
+    sessionTimeLookup[timeRow[0]] = timeRow[1];
+  });
 
-  const updatedRows = candidateRows.map(
-    function(examineeRow){
-      examineeRow[timeIndex] = sessionTimeLookup[examineeRow[sessionIndex]];
-      return examineeRow;
-    }
-  );
+  exam.sessions.forEach(function(session, sessionNumber){
+    const timeValue = sessionTimeLookup[sessionNumber] || "";
+    session.classrooms.forEach(function(classroom){
+      classroom.students.forEach(function(student){
+        student[columns.time] = timeValue;
+      });
+    });
+  });
 
-  if(updatedRows.length === candidateRows.length){
-    writeRangeValuesSafely(FILTERED_RESULT_SHEET.getRange(2, 1, updatedRows.length, updatedRows[0].length), updatedRows);
-  } else {
-    Logger.log("寫入節次時間失敗！");
-    SpreadsheetApp.getUi().alert("寫入節次時間失敗！");
-  }
+  saveExamToSheet(exam);
 }
 
 
+/**
+ * 計算試場人數、大小袋人數、班級人數
+ * 
+ * 使用 Exam 物件的統計屬性計算各種人數，
+ * 並更新到每個學生的對應欄位。
+ */
 function updateBagAndClassPopulations() {
-  const [headerRow, ...candidateRows] = FILTERED_RESULT_SHEET.getDataRange().getValues();
-  const classIndex = headerRow.indexOf("班級");
-  const bigBagIndex = headerRow.indexOf("大袋序號");
-  const smallBagIndex = headerRow.indexOf("小袋序號");
-  const bigBagPopulationIndex = headerRow.indexOf("大袋人數");
-  const smallBagPopulationIndex = headerRow.indexOf("小袋人數");
-  const classPopulationIndex = headerRow.indexOf("班級人數");
+  const exam = createExamFromSheet();
+  const columns = getColumnIndices();
 
-  const bigBagCounts = {};
-  const smallBagCounts = {};
-  const classCounts = {};
-  candidateRows.forEach(
-    function(examineeRow){
-      const bigBagKey = "大袋" + examineeRow[bigBagIndex];
-      if(Object.keys(bigBagCounts).includes(bigBagKey)){
-        bigBagCounts[bigBagKey] += 1;
-      } else {
-        bigBagCounts[bigBagKey] = 1;
-      }
+  // 計算班級人數（全考試層級）
+  const classPopulationMap = {};
+  exam.sessions.forEach(function(session){
+    session.students.forEach(function(student){
+      const className = student[columns.class];
+      classPopulationMap[className] = (classPopulationMap[className] || 0) + 1;
+    });
+  });
 
-      const smallBagKey = "小袋" + examineeRow[smallBagIndex];
-      if(Object.keys(smallBagCounts).includes(smallBagKey)){
-        smallBagCounts[smallBagKey] += 1;
-      } else {
-        smallBagCounts[smallBagKey] = 1;
-      }
+  // 更新所有欄位
+  exam.sessions.forEach(function(session){
+    session.classrooms.forEach(function(classroom){
+      // 小袋人數 = 班級科目組合的人數
+      const classSubjectStats = classroom.classSubjectStatistics;
+      
+      // 大袋人數 = 試場人數
+      const bigBagPopulation = classroom.population;
 
-      const classKey = "班級" + examineeRow[smallBagIndex] + examineeRow[classIndex];
-      if(Object.keys(classCounts).includes(classKey)){
-        classCounts[classKey] += 1;
-      } else {
-        classCounts[classKey] = 1;
-      }
-    }
-  );
+      classroom.students.forEach(function(student){
+        const classSubjectKey = student[columns.class] + student[columns.subject];
+        student[columns.smallBagPopulation] = classSubjectStats[classSubjectKey] || 0;
+        student[columns.bigBagPopulation] = bigBagPopulation;
+        student[columns.classPopulation] = classPopulationMap[student[columns.class]] || 0;
+      });
+    });
+  });
 
-  candidateRows.forEach(
-    function(examineeRow){
-      const bigBagKey = "大袋" + examineeRow[bigBagIndex];
-      const smallBagKey = "小袋" + examineeRow[smallBagIndex];
-      const classKey = "班級" + examineeRow[smallBagIndex] + examineeRow[classIndex];
-      examineeRow[bigBagPopulationIndex] = bigBagCounts[bigBagKey];
-      examineeRow[smallBagPopulationIndex] = smallBagCounts[smallBagKey];
-      examineeRow[classPopulationIndex] = classCounts[classKey];
-    }
-  );
-
-  writeRangeValuesSafely(FILTERED_RESULT_SHEET.getRange(2, 1, candidateRows.length, candidateRows[0].length), candidateRows);
+  saveExamToSheet(exam);
 }
 
 

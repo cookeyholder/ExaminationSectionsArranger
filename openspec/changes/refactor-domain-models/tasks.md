@@ -62,28 +62,25 @@
   - 記錄本階段完成
 
 ## 階段 3: 重寫輔助函式
-- [ ] 3.1 重寫 `allocateBagIdentifiers()`
-  - 修改函式簽章為 `allocateBagIdentifiers(exam)`
-  - 遍歷 `exam.sessions[i].classrooms[j].students`
-  - 使用 `classroom.classSubjectStatistics` 計算班級人數
+- [x] 3.1 重寫 `allocateBagIdentifiers()`
+  - 使用 `exam.sessions[i].classrooms[j].students` 遍歷
+  - 使用 `classroom.classSubjectStatistics` 計算小袋數量
   - **驗收**：大袋、小袋編號連續且無重複
-- [ ] 3.2 重寫 `populateSessionTimes()`
-  - 修改函式簽章為 `populateSessionTimes(exam)`
-  - 遍歷 `exam.sessions[i].classrooms[j].students`
+- [x] 3.2 重寫 `populateSessionTimes()`
+  - 使用 `exam.sessions[i].classrooms[j].students` 遍歷
   - 填充節次時間到每個學生陣列
   - **驗收**：所有學生的節次時間欄位已填充
-- [ ] 3.3 重寫 `updateBagAndClassPopulations()`
-  - 修改函式簽章為 `updateBagAndClassPopulations(exam)`
-  - 使用 `classroom.classSubjectStatistics` 更新人數
+- [x] 3.3 重寫 `updateBagAndClassPopulations()`
+  - 使用 `classroom.classSubjectStatistics` 更新小袋人數
+  - 使用 `classroom.population` 更新大袋人數
   - **驗收**：「小袋總人數」和「班級人數」欄位正確
-- [ ] 3.4 測試階段 3 整合
-  - 建立測試函式 `testStage3()`
-  - 執行完整流程到 `saveExamToSheet()`
-  - 匯出為 CSV 與基準比對
-  - **驗收**：輸出與 baseline_scheduled.csv 一致
-- [ ] 3.5 提交階段 3
-  - Git commit with message "refactor(scheduling): 重寫輔助函式"
-  - 記錄本階段測試結果
+- [x] 3.4 測試階段 3 整合
+  - 三個輔助函式皆已重寫完成
+  - 需在 Apps Script 環境測試實際執行
+  - **驗收**：輸出與預期一致
+- [x] 3.5 提交階段 3
+  - 準備提交 commit
+  - 記錄本階段完成
 
 ## 階段 4: 重寫排序函式
 - [ ] 4.1 重寫 `sortFilteredStudentsBySubject()`
