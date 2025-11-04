@@ -372,12 +372,7 @@ function composeBigBagDataset() {
 
             // 若監考老師資料表缺少該節次或該節次下沒有對應試場，回退為空字串而非跳過整列
             var invigilatorName = "";
-            if (
-                invigilatorAssignment &&
-                !isNaN(sessionNum) &&
-                invigilatorAssignment[sessionNum] &&
-                !isNaN(roomNum)
-            ) {
+            if (invigilatorAssignment && invigilatorAssignment[sessionNum]) {
                 invigilatorName =
                     invigilatorAssignment[sessionNum][roomNum] || "";
             }
