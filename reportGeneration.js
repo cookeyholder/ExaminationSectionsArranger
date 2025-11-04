@@ -361,19 +361,22 @@ function composeBigBagDataset() {
             const sessionNum = parseInt(examineeRow[sessionIndex]);
             const roomNum = parseInt(examineeRow[roomIndex]);
 
-            if (
-                isNaN(sessionNum) ||
-                isNaN(roomNum) ||
-                !invigilatorAssignment[sessionNum]
-            ) {
+            // 如果節次或試場為非數字，無法定位該試場，跳過該筆
+            if (isNaN(sessionNum) || isNaN(roomNum)) {
                 Logger.log(
                     `無效的節次/試場索引: 節次=${sessionNum}, 試場=${roomNum}`
                 );
                 return;
             }
 
-            const bagRange =
-                smallBagRangeByBigBag["大袋" + examineeRow[bigBagIndex]];
+            const bagRange = smallBagRangeByBigBag["大袋" + examineeRow[bigBagIndex]];
+
+            // 若監考老師資料表缺少該節次或該節次下沒有對應試場，回退為空字串而非跳過整列
+            var invigilatorName = "";
+            if (invigilatorAssignment && invigilatorAssignment[sessionNum]) {
+                invigilatorName = invigilatorAssignment[sessionNum][roomNum] || "";
+            }
+
             const datasetRow = [
                 schoolYearValue,
                 semesterValue,
@@ -383,7 +386,7 @@ function composeBigBagDataset() {
                 makeUpDateValue,
                 examineeRow[timeIndex],
                 Math.min(...bagRange) + "-" + Math.max(...bagRange),
-                invigilatorAssignment[sessionNum][roomNum] || "",
+                invigilatorName,
                 examineeRow[bigBagPopulationIndex],
             ];
 
