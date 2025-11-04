@@ -315,14 +315,12 @@ function composeBigBagDataset() {
     const invigilatorAssignment = transposeMatrix(
         INVIGILATOR_ASSIGNMENT_SHEET.getDataRange().getValues()
     );
-    Logger.log(invigilatorAssignment);
 
     const bigBagIndex = headerRow.indexOf("大袋序號");
     const smallBagIndex = headerRow.indexOf("小袋序號");
     const sessionIndex = headerRow.indexOf("節次");
     const timeIndex = headerRow.indexOf("時間");
     const roomIndex = headerRow.indexOf("試場");
-    const invigilatorIndex = headerRow.indexOf("監考教師");
     const bigBagPopulationIndex = headerRow.indexOf("大袋人數");
 
     BIG_BAG_DATA_SHEET.clear();
@@ -369,12 +367,14 @@ function composeBigBagDataset() {
                 return;
             }
 
-            const bagRange = smallBagRangeByBigBag["大袋" + examineeRow[bigBagIndex]];
+            const bagRange =
+                smallBagRangeByBigBag["大袋" + examineeRow[bigBagIndex]];
 
             // 若監考老師資料表缺少該節次或該節次下沒有對應試場，回退為空字串而非跳過整列
             var invigilatorName = "";
             if (invigilatorAssignment && invigilatorAssignment[sessionNum]) {
-                invigilatorName = invigilatorAssignment[sessionNum][roomNum] || "";
+                invigilatorName =
+                    invigilatorAssignment[sessionNum][roomNum] || "";
             }
 
             const datasetRow = [
@@ -407,5 +407,6 @@ function composeBigBagDataset() {
 }
 
 function transposeMatrix(matrix) {
+    if (!matrix || matrix.length === 0) return [];
     return matrix[0].map((_, colIndex) => matrix.map((row) => row[colIndex]));
 }
