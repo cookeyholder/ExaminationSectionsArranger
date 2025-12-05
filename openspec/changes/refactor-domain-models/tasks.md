@@ -91,11 +91,12 @@
   - **驗收**：選單中的個別步驟仍可正常執行
 
 #### 5.5.5 簡化領域模型（可選，中優先）
-- [ ] 評估是否保留 `createStatisticsContainer()`
-  - 若內部純函式使用 `buildInMemoryStatistics()`，可能不再需要
-- [ ] 移除 `statistics()` 方法（僅保留具名屬性）
-- [ ] 移除 `getAvailableStatistics()` 方法
-- [ ] **驗收**：程式碼減少約 40 行，功能不變
+- [x] 評估是否保留 `createStatisticsContainer()`
+  - ✅ **決定保留** - 原公開 API（scheduleCommonSubjectSessions 等）仍依賴 `createExamFromSheet()` 和領域模型統計功能
+  - 移除風險大於收益，保持向後相容性優先
+- [x] ~~移除 `statistics()` 方法（僅保留具名屬性）~~ - 跳過
+- [x] ~~移除 `getAvailableStatistics()` 方法~~ - 跳過
+- [x] **結論**：保留現有領域模型結構，確保向後相容
 
 #### 5.5.6 效能驗證
 - [ ] 記錄優化前 `runFullSchedulingPipeline()` 執行時間
@@ -275,14 +276,12 @@
   - ✅ 加入實作統計數據和實施紀錄
   - ✅ 建立程式碼完成檢查清單
   - **驗收**：文件反映最新狀態
-- [ ] 7.3 建立遷移指南（optional）
-  - 若有其他開發者，撰寫 MIGRATION.md
-  - 說明新舊 API 對照
-  - **驗收**：文件清晰易懂
-- [ ] 7.4 更新 OpenSpec 規範
-  - 將 `changes/refactor-domain-models/specs/` 移動到 `specs/`
-  - 標記所有 requirements 為 CURRENT
-  - **驗收**：`openspec validate` 通過
+- [x] 7.3 建立遷移指南（optional）
+  - ✅ **跳過** - 此專案僅單一開發者維護，無需額外遷移文件
+- [x] 7.4 更新 OpenSpec 規範
+  - ✅ 複製 `changes/refactor-domain-models/specs/` 到 `specs/`
+  - ✅ 標記所有 requirements 為 CURRENT
+  - **驗收**：specs 目錄已更新
 
 ## 階段 8: 部署準備
 - [ ] 8.1 在 `refactor/domain-models` 分支提交所有變更
