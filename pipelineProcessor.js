@@ -156,10 +156,24 @@ function pipeline_scheduleSpecializedSubjects(ctx) {
         compareCountDescending
     );
 
-    // ===== 步驟 2: 節次統計初始化 =====
+    // ===== 步驟 2: 節次統計初始化（計入已被共同科目佔用的人數）=====
     const sessionStats = {};
     for (let i = 1; i <= maxSessionCount; i++) {
         sessionStats[i] = { population: 0, deptGrade: {} };
+    }
+
+    // 統計已分配節次的學生（共同科目），更新 sessionStats
+    for (let i = 0; i < students.length; i++) {
+        const student = students[i];
+        const sessionNum = student[columns.session];
+        if (sessionNum > 0 && sessionNum <= maxSessionCount) {
+            sessionStats[sessionNum].population++;
+
+            // 同時記錄該科別年級已在此節次有科目
+            const deptGradeKey =
+                student[columns.department] + student[columns.grade];
+            sessionStats[sessionNum].deptGrade[deptGradeKey] = true;
+        }
     }
 
     // 記錄已分配的群組
@@ -333,10 +347,15 @@ function pipeline_assignRooms(ctx) {
                 // 檢查科目數限制（只有新科目才需要檢查）
                 const currentSubjectCount = Object.keys(room.subjects).length;
                 const isNewSubject = !room.subjects[subjectName];
-                if (isNewSubject && currentSubjectCount + 1 > maxSubjectsPerRoom) continue;
+                if (
+                    isNewSubject &&
+                    currentSubjectCount + 1 > maxSubjectsPerRoom
+                )
+                    continue;
 
                 // 計算剩餘空間，選擇剩餘空間最小的（最佳適配）
-                const remainingSpace = maxStudentsPerRoom - room.population - count;
+                const remainingSpace =
+                    maxStudentsPerRoom - room.population - count;
                 if (remainingSpace < bestRemainingSpace) {
                     bestRemainingSpace = remainingSpace;
                     bestRoom = roomNumber;
