@@ -248,9 +248,7 @@ function pipeline_scheduleSpecializedSubjects(ctx) {
             })
             .join("、");
 
-        ctx.warnings.push(
-            "以下班級科目無法排入節次：\n" + detailList
-        );
+        ctx.warnings.push("以下班級科目無法排入節次：\n" + detailList);
     }
 
     ctx.stats.unscheduledCount = unscheduledCount;
@@ -405,8 +403,10 @@ function pipeline_assignRooms(ctx) {
             const session = student[columns.session];
             const room = student[columns.room];
             if (session > 0 && (room === 0 || room === "")) {
-                const key = student[columns.class] + " " + student[columns.subject];
-                unscheduledRoomDetails[key] = (unscheduledRoomDetails[key] || 0) + 1;
+                const key =
+                    student[columns.class] + " " + student[columns.subject];
+                unscheduledRoomDetails[key] =
+                    (unscheduledRoomDetails[key] || 0) + 1;
             }
         }
 
@@ -417,9 +417,7 @@ function pipeline_assignRooms(ctx) {
                 })
                 .join("、");
 
-            ctx.warnings.push(
-                "以下班級科目無法排入試場：\n" + detailList
-            );
+            ctx.warnings.push("以下班級科目無法排入試場：\n" + detailList);
         } else {
             ctx.warnings.push(
                 "現有試場數無法容納所有補考學生，請增加試場數或調整每間試場人數上限！"
@@ -759,18 +757,27 @@ function pipeline_executeRoomAssignment() {
  */
 function pipeline_sortByClassSeat(students, columns) {
     return students.slice().sort(function (a, b) {
-        if (a[columns.department] !== b[columns.department])
-            return a[columns.department].localeCompare(
-                b[columns.department],
-                "zh-TW"
-            );
+        // 學號第2-5碼（例如 "11301234" 取 "1301"）
+        const aStudentIdPart = String(a[columns.studentId]).substring(1, 5);
+        const bStudentIdPart = String(b[columns.studentId]).substring(1, 5);
+        if (aStudentIdPart !== bStudentIdPart)
+            return aStudentIdPart.localeCompare(bStudentIdPart);
+        // 年級
         if (a[columns.grade] !== b[columns.grade])
             return a[columns.grade].localeCompare(b[columns.grade], "zh-TW");
-        if (a[columns.seatNumber] !== b[columns.seatNumber])
-            return a[columns.seatNumber] - b[columns.seatNumber];
+        // 班級
+        if (a[columns.class] !== b[columns.class])
+            return a[columns.class].localeCompare(b[columns.class], "zh-TW");
+        // 學號
+        if (a[columns.studentId] !== b[columns.studentId])
+            return String(a[columns.studentId]).localeCompare(
+                String(b[columns.studentId])
+            );
+        // 節次
         if (a[columns.session] !== b[columns.session])
             return a[columns.session] - b[columns.session];
-        return a[columns.subject].localeCompare(b[columns.subject], "zh-TW");
+        // 試場
+        return a[columns.room] - b[columns.room];
     });
 }
 
