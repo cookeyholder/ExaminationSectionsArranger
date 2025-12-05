@@ -501,11 +501,8 @@ function pipeline_executeFullScheduling() {
     // 階段 4: 一次性寫回
     pipeline_saveData(ctx);
 
-    // 階段 5: 產生報表
-    createExamBulletinSheet();
-    createProctorRecordSheet();
-    composeSmallBagDataset();
-    composeBigBagDataset();
+    // 階段 5: 產生報表（直接使用記憶體中的資料，避免重複讀取和排序）
+    pipeline_generateAllReports(ctx);
 
     // 顯示警告
     ctx.warnings.forEach(function (warning) {
@@ -549,11 +546,8 @@ function pipeline_executePostAdjustment() {
     // 一次性寫回
     pipeline_saveData(ctx);
 
-    // 產生報表
-    createExamBulletinSheet();
-    createProctorRecordSheet();
-    composeSmallBagDataset();
-    composeBigBagDataset();
+    // 產生報表（直接使用記憶體中的資料，避免重複讀取和排序）
+    pipeline_generateAllReports(ctx);
 
     const elapsedSeconds = calculateElapsedSeconds(runtimeStart);
     ctx.stats.elapsedSeconds = elapsedSeconds;
@@ -621,4 +615,434 @@ function pipeline_executeRoomAssignment() {
         stats: ctx.stats,
         warnings: ctx.warnings,
     };
+}
+
+// ============================================================================
+// 優化版報表函式（使用記憶體中的資料）
+// ============================================================================
+
+/**
+ * 按班級座號排序學生（記憶體內排序，不寫回工作表）
+ *
+ * 排序順序：科別 → 年級 → 座號 → 節次 → 科目
+ *
+ * @param {Array} students - 學生陣列
+ * @param {Object} columns - 欄位索引
+ * @returns {Array} 排序後的學生陣列副本
+ */
+function pipeline_sortByClassSeat(students, columns) {
+    return students.slice().sort(function (a, b) {
+        if (a[columns.department] !== b[columns.department])
+            return a[columns.department].localeCompare(
+                b[columns.department],
+                "zh-TW"
+            );
+        if (a[columns.grade] !== b[columns.grade])
+            return a[columns.grade].localeCompare(b[columns.grade], "zh-TW");
+        if (a[columns.seatNumber] !== b[columns.seatNumber])
+            return a[columns.seatNumber] - b[columns.seatNumber];
+        if (a[columns.session] !== b[columns.session])
+            return a[columns.session] - b[columns.session];
+        return a[columns.subject].localeCompare(b[columns.subject], "zh-TW");
+    });
+}
+
+/**
+ * 產生公告版補考場次（使用記憶體中的資料）
+ *
+ * @param {Object} ctx - Pipeline 上下文
+ */
+function pipeline_createExamBulletinSheet(ctx) {
+    const columns = ctx.columns;
+
+    // 按班級座號排序（建立副本，不影響原資料）
+    const sortedStudents = pipeline_sortByClassSeat(ctx.students, columns);
+
+    BULLETIN_OUTPUT_SHEET.clear();
+    if (BULLETIN_OUTPUT_SHEET.getMaxRows() > 5) {
+        BULLETIN_OUTPUT_SHEET.deleteRows(
+            2,
+            BULLETIN_OUTPUT_SHEET.getMaxRows() - 5
+        );
+    }
+
+    const bulletinRows = [["班級", "學號", "姓名", "科目", "節次", "試場"]];
+    sortedStudents.forEach(function (student) {
+        const studentName = student[columns.name];
+        let maskedName = "";
+        if (studentName.length === 2) {
+            maskedName = studentName.toString().slice(0, 1) + "〇";
+        } else {
+            const middleMaskLength = studentName.length - 2;
+            maskedName =
+                studentName.toString().slice(0, 1) +
+                "〇".repeat(middleMaskLength) +
+                studentName.toString().slice(-1);
+        }
+
+        bulletinRows.push([
+            student[columns.class],
+            student[columns.studentId],
+            maskedName,
+            student[columns.subject],
+            student[columns.session],
+            student[columns.room],
+        ]);
+    });
+
+    writeRangeValuesSafely(
+        BULLETIN_OUTPUT_SHEET.getRange(
+            2,
+            1,
+            bulletinRows.length,
+            bulletinRows[0].length
+        ),
+        bulletinRows
+    );
+
+    // 格式化
+    const schoolYearValue = ctx.params.schoolYear || PARAMETERS_SHEET.getRange("B2").getValue();
+    const semesterValue = ctx.params.semester || PARAMETERS_SHEET.getRange("B3").getValue();
+
+    BULLETIN_OUTPUT_SHEET.getRange("A1:F1").mergeAcross();
+    BULLETIN_OUTPUT_SHEET.getRange("A1").setValue(
+        "高雄高工" +
+            schoolYearValue +
+            "學年度第" +
+            semesterValue +
+            "學期補考名單"
+    );
+    BULLETIN_OUTPUT_SHEET.getRange("A1").setFontSize(20);
+    BULLETIN_OUTPUT_SHEET.getRange(
+        1,
+        1,
+        BULLETIN_OUTPUT_SHEET.getMaxRows(),
+        BULLETIN_OUTPUT_SHEET.getMaxColumns()
+    ).setHorizontalAlignment("center");
+    BULLETIN_OUTPUT_SHEET.setFrozenRows(2);
+    BULLETIN_OUTPUT_SHEET.getRange("A2:F").createFilter();
+    BULLETIN_OUTPUT_SHEET.getRange("A2:F").setBorder(
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        "#000000",
+        SpreadsheetApp.BorderStyle.SOLID
+    );
+}
+
+/**
+ * 產生試場紀錄表（使用記憶體中的資料）
+ *
+ * @param {Object} ctx - Pipeline 上下文
+ */
+function pipeline_createProctorRecordSheet(ctx) {
+    const columns = ctx.columns;
+    const schoolYearValue = ctx.params.schoolYear || PARAMETERS_SHEET.getRange("B2").getValue();
+    const semesterValue = ctx.params.semester || PARAMETERS_SHEET.getRange("B3").getValue();
+
+    // 資料已經按節次試場排序
+    const students = ctx.students;
+
+    RECORD_OUTPUT_SHEET.clear();
+    if (RECORD_OUTPUT_SHEET.getMaxRows() > 5) {
+        RECORD_OUTPUT_SHEET.deleteRows(2, RECORD_OUTPUT_SHEET.getMaxRows() - 5);
+    }
+
+    const recordRows = [
+        [
+            "A表：" +
+                schoolYearValue +
+                "學年度第" +
+                semesterValue +
+                "學期補考簽到及違規記錄表    　 　　　                                 監考教師簽名：　　　　　　　　　",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+        ],
+        [
+            "節次",
+            "試場",
+            "時間",
+            "班級",
+            "學號",
+            "姓名",
+            "科目名稱",
+            "班級人數",
+            "考生到考簽名",
+            "違規記錄(打V)",
+            "",
+            "其他違規\n請簡述",
+        ],
+        ["", "", "", "", "", "", "", "", "", "未帶有照證件", "服儀不整", ""],
+    ];
+
+    students.forEach(function (student) {
+        recordRows.push([
+            student[columns.session],
+            student[columns.room],
+            student[columns.time],
+            student[columns.class],
+            student[columns.studentId],
+            student[columns.name],
+            student[columns.subject],
+            student[columns.classPopulation],
+            "",
+            "",
+            "",
+            "",
+        ]);
+    });
+
+    writeRangeValuesSafely(
+        RECORD_OUTPUT_SHEET.getRange(
+            1,
+            1,
+            recordRows.length,
+            recordRows[0].length
+        ),
+        recordRows
+    );
+
+    // 格式化
+    RECORD_OUTPUT_SHEET.getRange("A1:L1")
+        .mergeAcross()
+        .setVerticalAlignment("bottom")
+        .setFontSize(14)
+        .setFontWeight("bold");
+    RECORD_OUTPUT_SHEET.getRange("J2:K2").mergeAcross();
+    RECORD_OUTPUT_SHEET.getRange("A2:A3")
+        .mergeVertically()
+        .setVerticalAlignment("middle");
+    RECORD_OUTPUT_SHEET.getRange("B2:B3")
+        .mergeVertically()
+        .setVerticalAlignment("middle");
+    RECORD_OUTPUT_SHEET.getRange("C2:C3")
+        .mergeVertically()
+        .setVerticalAlignment("middle");
+    RECORD_OUTPUT_SHEET.getRange("D2:D3")
+        .mergeVertically()
+        .setVerticalAlignment("middle");
+    RECORD_OUTPUT_SHEET.getRange("E2:E3")
+        .mergeVertically()
+        .setVerticalAlignment("middle");
+    RECORD_OUTPUT_SHEET.getRange("F2:F3")
+        .mergeVertically()
+        .setVerticalAlignment("middle");
+    RECORD_OUTPUT_SHEET.getRange("G2:G3")
+        .mergeVertically()
+        .setVerticalAlignment("middle");
+    RECORD_OUTPUT_SHEET.getRange("H2:H3")
+        .mergeVertically()
+        .setVerticalAlignment("middle");
+    RECORD_OUTPUT_SHEET.getRange("I2:I3")
+        .mergeVertically()
+        .setVerticalAlignment("middle");
+    RECORD_OUTPUT_SHEET.getRange("L2:L3")
+        .mergeVertically()
+        .setVerticalAlignment("middle");
+
+    RECORD_OUTPUT_SHEET.getRange(
+        2,
+        1,
+        recordRows.length + 2,
+        recordRows[0].length
+    )
+        .setHorizontalAlignment("center")
+        .setVerticalAlignment("middle")
+        .setBorder(
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            "#000000",
+            SpreadsheetApp.BorderStyle.SOLID
+        );
+}
+
+/**
+ * 產生小袋封面套印用資料（使用記憶體中的資料）
+ *
+ * @param {Object} ctx - Pipeline 上下文
+ */
+function pipeline_composeSmallBagDataset(ctx) {
+    const columns = ctx.columns;
+    const schoolYearValue = ctx.params.schoolYear || PARAMETERS_SHEET.getRange("B2").getValue();
+    const semesterValue = ctx.params.semester || PARAMETERS_SHEET.getRange("B3").getValue();
+
+    SMALL_BAG_DATA_SHEET.clear();
+    if (SMALL_BAG_DATA_SHEET.getMaxRows() > 5) {
+        SMALL_BAG_DATA_SHEET.deleteRows(
+            2,
+            SMALL_BAG_DATA_SHEET.getMaxRows() - 5
+        );
+    }
+
+    const smallBagRows = [
+        [
+            "學年度",
+            "學期",
+            "小袋序號",
+            "節次",
+            "時間",
+            "試場",
+            "班級",
+            "科目名稱",
+            "任課老師",
+            "小袋人數",
+            "電腦",
+            "人工",
+        ],
+    ];
+    const processedSmallBags = [];
+
+    ctx.students.forEach(function (student) {
+        const smallBagId = student[columns.smallBagId];
+        if (!processedSmallBags.includes(smallBagId)) {
+            smallBagRows.push([
+                schoolYearValue,
+                semesterValue,
+                smallBagId,
+                student[columns.session],
+                student[columns.time],
+                student[columns.room],
+                student[columns.class],
+                student[columns.subject],
+                student[columns.teacher],
+                student[columns.smallBagPopulation],
+                student[columns.computer],
+                student[columns.manual],
+            ]);
+            processedSmallBags.push(smallBagId);
+        }
+    });
+
+    writeRangeValuesSafely(
+        SMALL_BAG_DATA_SHEET.getRange(
+            1,
+            1,
+            smallBagRows.length,
+            smallBagRows[0].length
+        ),
+        smallBagRows
+    );
+}
+
+/**
+ * 產生大袋封面套印用資料（使用記憶體中的資料）
+ *
+ * @param {Object} ctx - Pipeline 上下文
+ */
+function pipeline_composeBigBagDataset(ctx) {
+    const columns = ctx.columns;
+    const schoolYearValue = ctx.params.schoolYear || PARAMETERS_SHEET.getRange("B2").getValue();
+    const semesterValue = ctx.params.semester || PARAMETERS_SHEET.getRange("B3").getValue();
+    const makeUpDateValue = PARAMETERS_SHEET.getRange("B13").getValue();
+    const invigilatorAssignment = transposeMatrix(
+        INVIGILATOR_ASSIGNMENT_SHEET.getDataRange().getValues()
+    );
+
+    BIG_BAG_DATA_SHEET.clear();
+    if (BIG_BAG_DATA_SHEET.getMaxRows() > 5) {
+        BIG_BAG_DATA_SHEET.deleteRows(2, BIG_BAG_DATA_SHEET.getMaxRows() - 5);
+    }
+
+    const bigBagRows = [
+        [
+            "學年度",
+            "學期",
+            "大袋序號",
+            "節次",
+            "試場",
+            "補考日期",
+            "時間",
+            "試卷袋序號",
+            "監考教師",
+            "各試場人數",
+        ],
+    ];
+    const processedBigBags = [];
+
+    // 計算每個大袋包含的小袋範圍
+    const smallBagRangeByBigBag = {};
+    ctx.students.forEach(function (student) {
+        const bigBagKey = "大袋" + student[columns.bigBagId];
+        if (!Object.keys(smallBagRangeByBigBag).includes(bigBagKey)) {
+            smallBagRangeByBigBag[bigBagKey] = [student[columns.smallBagId]];
+        } else {
+            smallBagRangeByBigBag[bigBagKey].push(student[columns.smallBagId]);
+        }
+    });
+
+    ctx.students.forEach(function (student) {
+        const bigBagId = student[columns.bigBagId];
+        if (!processedBigBags.includes(bigBagId)) {
+            const sessionNum = parseInt(student[columns.session]);
+            const roomNum = parseInt(student[columns.room]);
+
+            if (isNaN(sessionNum) || isNaN(roomNum)) {
+                Logger.log(
+                    `無效的節次/試場索引: 節次=${sessionNum}, 試場=${roomNum}`
+                );
+                return;
+            }
+
+            const bagRange = smallBagRangeByBigBag["大袋" + bigBagId];
+
+            var invigilatorName = "";
+            if (invigilatorAssignment && invigilatorAssignment[sessionNum]) {
+                invigilatorName =
+                    invigilatorAssignment[sessionNum][roomNum] || "";
+            }
+
+            bigBagRows.push([
+                schoolYearValue,
+                semesterValue,
+                bigBagId,
+                student[columns.session],
+                student[columns.room],
+                makeUpDateValue,
+                student[columns.time],
+                Math.min(...bagRange) + "-" + Math.max(...bagRange),
+                invigilatorName,
+                student[columns.bigBagPopulation],
+            ]);
+
+            processedBigBags.push(bigBagId);
+        }
+    });
+
+    writeRangeValuesSafely(
+        BIG_BAG_DATA_SHEET.getRange(
+            1,
+            1,
+            bigBagRows.length,
+            bigBagRows[0].length
+        ),
+        bigBagRows
+    );
+}
+
+/**
+ * 產生所有報表（使用記憶體中的資料）
+ *
+ * @param {Object} ctx - Pipeline 上下文
+ */
+function pipeline_generateAllReports(ctx) {
+    pipeline_createExamBulletinSheet(ctx);
+    pipeline_createProctorRecordSheet(ctx);
+    pipeline_composeSmallBagDataset(ctx);
+    pipeline_composeBigBagDataset(ctx);
 }
