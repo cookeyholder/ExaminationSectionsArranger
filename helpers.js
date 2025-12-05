@@ -1,4 +1,8 @@
 function writeRangeValuesSafely(targetRange, valueMatrix){
+  if (!valueMatrix || valueMatrix.length === 0) {
+    Logger.log("writeRangeValuesSafely: 無資料可寫入");
+    return;
+  }
   if (targetRange.getLastColumn() === valueMatrix[0].length){
     targetRange.setValues(valueMatrix);
   } else {

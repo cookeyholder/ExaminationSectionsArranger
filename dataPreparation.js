@@ -185,9 +185,11 @@ function buildFilteredCandidateList(){
     }
   );
 
-  FILTERED_RESULT_SHEET.getRange(2, 1, filteredRows.length, filteredRows[0].length)
-    .setNumberFormat('@STRING@')
-    .setValues(filteredRows);
+  if (filteredRows.length > 0) {
+    FILTERED_RESULT_SHEET.getRange(2, 1, filteredRows.length, filteredRows[0].length)
+      .setNumberFormat('@STRING@')
+      .setValues(filteredRows);
+  }
 }
 
 

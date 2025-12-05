@@ -836,13 +836,15 @@ function sortFilteredStudentsBySubject() {
     });
 
     // 直接寫回工作表
-    const [headerRow] = FILTERED_RESULT_SHEET.getDataRange().getValues();
-    FILTERED_RESULT_SHEET.getRange(
-        2,
-        1,
-        allStudents.length,
-        allStudents[0].length
-    ).setValues(allStudents);
+    if (allStudents.length > 0) {
+        const [headerRow] = FILTERED_RESULT_SHEET.getDataRange().getValues();
+        FILTERED_RESULT_SHEET.getRange(
+            2,
+            1,
+            allStudents.length,
+            allStudents[0].length
+        ).setValues(allStudents);
+    }
 }
 
 /**
@@ -886,13 +888,15 @@ function sortFilteredStudentsByClassSeat() {
     });
 
     // 直接寫回工作表
-    const [headerRow] = FILTERED_RESULT_SHEET.getDataRange().getValues();
-    FILTERED_RESULT_SHEET.getRange(
-        2,
-        1,
-        allStudents.length,
-        allStudents[0].length
-    ).setValues(allStudents);
+    if (allStudents.length > 0) {
+        const [headerRow] = FILTERED_RESULT_SHEET.getDataRange().getValues();
+        FILTERED_RESULT_SHEET.getRange(
+            2,
+            1,
+            allStudents.length,
+            allStudents[0].length
+        ).setValues(allStudents);
+    }
 }
 
 /**
@@ -940,13 +944,15 @@ function sortFilteredStudentsBySessionRoom() {
     });
 
     // 直接寫回工作表
-    const [headerRow] = FILTERED_RESULT_SHEET.getDataRange().getValues();
-    FILTERED_RESULT_SHEET.getRange(
-        2,
-        1,
-        allStudents.length,
-        allStudents[0].length
-    ).setValues(allStudents);
+    if (allStudents.length > 0) {
+        const [headerRow] = FILTERED_RESULT_SHEET.getDataRange().getValues();
+        FILTERED_RESULT_SHEET.getRange(
+            2,
+            1,
+            allStudents.length,
+            allStudents[0].length
+        ).setValues(allStudents);
+    }
 }
 
 function compareCountDescending(firstEntry, secondEntry) {

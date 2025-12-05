@@ -32,14 +32,14 @@
  */
 function pipeline_createContext() {
     return {
-        students: [],        // 學生資料陣列
-        headerRow: [],       // 標題列
-        columns: {},         // 欄位索引
-        params: {},          // 參數配置
-        sessionRules: {},    // 科目節次規則
-        sessionTimes: [],    // 節次時間資料
-        warnings: [],        // 警告訊息
-        stats: {},           // 統計資訊
+        students: [], // 學生資料陣列
+        headerRow: [], // 標題列
+        columns: {}, // 欄位索引
+        params: {}, // 參數配置
+        sessionRules: {}, // 科目節次規則
+        sessionTimes: [], // 節次時間資料
+        warnings: [], // 警告訊息
+        stats: {}, // 統計資訊
     };
 }
 
