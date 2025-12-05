@@ -103,8 +103,11 @@
 - [ ] **驗收**：執行時間減少 50% 以上（目標：60-70%）
 
 #### 5.5.7 提交階段 5.5
-- [ ] Git commit with message "perf(scheduling): 採用單次讀取-Pipeline處理-單次寫入模式"
-- [ ] 記錄效能提升數據
+- [x] Git commit with message "perf(scheduling): 採用單次讀取-Pipeline處理-單次寫入模式"
+- [x] 記錄效能提升數據
+  - 已提交 commit eefcdb3
+  - 程式碼變更：+4982 行，-103 行（含文件和測試資料）
+  - 核心效能優化：I/O 從 16-20 次降至 3-4 次
 
 ---
 
@@ -210,14 +213,6 @@
 - [x] 4.5 提交階段 4
   - 準備提交 commit
   - 記錄本階段完成
-- [ ] 4.4 測試階段 4 整合
-  - 執行「步驟 1」完整流程
-  - 比對「公告版補考場次」與 baseline_bulletin.csv
-  - 比對「試場記錄表」與 baseline_classrooms.csv
-  - **驗收**：所有輸出與基準一致
-- [ ] 4.5 提交階段 4
-  - Git commit with message "refactor(scheduling): 重寫排序函式"
-  - 記錄本階段測試結果
 
 ## 階段 5: 清理舊程式碼
 - [x] 5.1 從 `scheduling.js` 移除 `createEmptyClassroomRecord()`
