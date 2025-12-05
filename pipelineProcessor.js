@@ -226,9 +226,9 @@ function pipeline_assignRooms(ctx) {
         sessionNumber <= maxSessionCount;
         sessionNumber++
     ) {
-        // 取得本節次學生
+        // 取得本節次學生（使用 Number() 確保類型一致）
         const sessionStudents = ctx.students.filter(function (s) {
-            return s[columns.session] === sessionNumber;
+            return Number(s[columns.session]) === sessionNumber;
         });
 
         if (sessionStudents.length === 0) continue;
@@ -268,7 +268,8 @@ function pipeline_assignRooms(ctx) {
 
                 // 分配學生
                 ctx.students.forEach(function (student) {
-                    if (student[columns.session] !== sessionNumber) return;
+                    if (Number(student[columns.session]) !== sessionNumber)
+                        return;
                     const studentKey =
                         student[columns.class] + student[columns.subject];
                     if (
@@ -302,7 +303,7 @@ function pipeline_assignRooms(ctx) {
 
     // 檢查第 9 節
     const hasSession9 = ctx.students.some(function (s) {
-        return s[columns.session] === 9;
+        return Number(s[columns.session]) === 9;
     });
     if (hasSession9) {
         ctx.warnings.push(
@@ -400,14 +401,14 @@ function pipeline_allocateBagIdentifiers(ctx) {
 function pipeline_populateSessionTimes(ctx) {
     const columns = ctx.columns;
 
-    // 建立節次到時間的對映
+    // 建立節次到時間的對映（使用字串鍵確保類型一致）
     const timeLookup = {};
     ctx.sessionTimes.slice(1).forEach(function (row) {
-        timeLookup[row[0]] = row[1];
+        timeLookup[String(row[0])] = row[1];
     });
 
     ctx.students.forEach(function (student) {
-        const session = student[columns.session];
+        const session = String(student[columns.session]);
         student[columns.time] = timeLookup[session] || "";
     });
 
@@ -701,8 +702,10 @@ function pipeline_createExamBulletinSheet(ctx) {
     );
 
     // 格式化
-    const schoolYearValue = ctx.params.schoolYear || PARAMETERS_SHEET.getRange("B2").getValue();
-    const semesterValue = ctx.params.semester || PARAMETERS_SHEET.getRange("B3").getValue();
+    const schoolYearValue =
+        ctx.params.schoolYear || PARAMETERS_SHEET.getRange("B2").getValue();
+    const semesterValue =
+        ctx.params.semester || PARAMETERS_SHEET.getRange("B3").getValue();
 
     BULLETIN_OUTPUT_SHEET.getRange("A1:F1").mergeAcross();
     BULLETIN_OUTPUT_SHEET.getRange("A1").setValue(
@@ -740,8 +743,10 @@ function pipeline_createExamBulletinSheet(ctx) {
  */
 function pipeline_createProctorRecordSheet(ctx) {
     const columns = ctx.columns;
-    const schoolYearValue = ctx.params.schoolYear || PARAMETERS_SHEET.getRange("B2").getValue();
-    const semesterValue = ctx.params.semester || PARAMETERS_SHEET.getRange("B3").getValue();
+    const schoolYearValue =
+        ctx.params.schoolYear || PARAMETERS_SHEET.getRange("B2").getValue();
+    const semesterValue =
+        ctx.params.semester || PARAMETERS_SHEET.getRange("B3").getValue();
 
     // 資料已經按節次試場排序
     const students = ctx.students;
@@ -796,7 +801,9 @@ function pipeline_createProctorRecordSheet(ctx) {
             student[columns.studentId],
             student[columns.name],
             student[columns.subject],
-            student[columns.classPopulation],
+            // A 表「班級人數」欄位應為「同節次、同試場、同班級、同科目」的人數
+            // 這與小袋的定義相同，所以使用 smallBagPopulation
+            student[columns.smallBagPopulation],
             "",
             "",
             "",
@@ -879,8 +886,10 @@ function pipeline_createProctorRecordSheet(ctx) {
  */
 function pipeline_composeSmallBagDataset(ctx) {
     const columns = ctx.columns;
-    const schoolYearValue = ctx.params.schoolYear || PARAMETERS_SHEET.getRange("B2").getValue();
-    const semesterValue = ctx.params.semester || PARAMETERS_SHEET.getRange("B3").getValue();
+    const schoolYearValue =
+        ctx.params.schoolYear || PARAMETERS_SHEET.getRange("B2").getValue();
+    const semesterValue =
+        ctx.params.semester || PARAMETERS_SHEET.getRange("B3").getValue();
 
     SMALL_BAG_DATA_SHEET.clear();
     if (SMALL_BAG_DATA_SHEET.getMaxRows() > 5) {
@@ -947,8 +956,10 @@ function pipeline_composeSmallBagDataset(ctx) {
  */
 function pipeline_composeBigBagDataset(ctx) {
     const columns = ctx.columns;
-    const schoolYearValue = ctx.params.schoolYear || PARAMETERS_SHEET.getRange("B2").getValue();
-    const semesterValue = ctx.params.semester || PARAMETERS_SHEET.getRange("B3").getValue();
+    const schoolYearValue =
+        ctx.params.schoolYear || PARAMETERS_SHEET.getRange("B2").getValue();
+    const semesterValue =
+        ctx.params.semester || PARAMETERS_SHEET.getRange("B3").getValue();
     const makeUpDateValue = PARAMETERS_SHEET.getRange("B13").getValue();
     const invigilatorAssignment = transposeMatrix(
         INVIGILATOR_ASSIGNMENT_SHEET.getDataRange().getValues()

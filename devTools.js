@@ -4,6 +4,156 @@
  */
 
 /**
+ * 診斷 Pipeline 共同科目節次分配問題
+ *
+ * 檢查以下項目：
+ * 1. sessionRules 的內容和類型
+ * 2. 學生資料中的節次欄位值和類型
+ * 3. 共同科目是否正確匹配
+ */
+function diagnosePipelineScheduling() {
+    // 載入資料
+    const ctx = pipeline_loadData();
+
+    const report = {
+        sessionRules: {},
+        sessionRulesKeyTypes: {},
+        sessionRulesValueTypes: {},
+        sampleStudents: [],
+        commonSubjectsMatched: [],
+        commonSubjectsNotMatched: [],
+        sessionColumnType: null,
+    };
+
+    // 檢查 sessionRules
+    Object.keys(ctx.sessionRules).forEach(function (key) {
+        const value = ctx.sessionRules[key];
+        report.sessionRules[key] = value;
+        report.sessionRulesKeyTypes[key] = typeof key;
+        report.sessionRulesValueTypes[key] = typeof value;
+    });
+
+    // 檢查前10筆學生資料
+    for (let i = 0; i < Math.min(10, ctx.students.length); i++) {
+        const student = ctx.students[i];
+        report.sampleStudents.push({
+            subject: student[ctx.columns.subject],
+            session: student[ctx.columns.session],
+            sessionType: typeof student[ctx.columns.session],
+            room: student[ctx.columns.room],
+        });
+    }
+
+    // 檢查共同科目匹配狀況
+    ctx.students.forEach(function (student) {
+        const subjectName = student[ctx.columns.subject];
+        if (ctx.sessionRules.hasOwnProperty(subjectName)) {
+            report.commonSubjectsMatched.push({
+                subject: subjectName,
+                ruleSession: ctx.sessionRules[subjectName],
+                studentSession: student[ctx.columns.session],
+                matches:
+                    student[ctx.columns.session] ===
+                    ctx.sessionRules[subjectName],
+            });
+        } else {
+            if (
+                !report.commonSubjectsNotMatched.some(function (s) {
+                    return s.subject === subjectName;
+                })
+            ) {
+                report.commonSubjectsNotMatched.push({
+                    subject: subjectName,
+                    ruleExists: false,
+                });
+            }
+        }
+    });
+
+    Logger.log(JSON.stringify(report, null, 2));
+    return report;
+}
+
+/**
+ * 診斷試場分配問題
+ *
+ * 檢查以下項目：
+ * 1. 各節次的學生數量
+ * 2. 試場 0 的學生（未分配）
+ */
+function diagnoseRoomAssignment() {
+    // 先執行共同科目和專業科目排程
+    buildFilteredCandidateList();
+    let ctx = pipeline_loadData();
+    ctx = pipeline_scheduleCommonSubjects(ctx);
+
+    const report = {
+        beforeSpecialized: {
+            total: ctx.students.length,
+            bySession: {},
+            session0Count: 0,
+            emptySessionCount: 0,
+        },
+        afterSpecialized: {
+            bySession: {},
+            session0Count: 0,
+        },
+        afterRoomAssign: {
+            bySession: {},
+            room0Students: [],
+        },
+    };
+
+    // 共同科目分配後
+    ctx.students.forEach(function (student) {
+        const session = student[ctx.columns.session];
+        if (session === 0) {
+            report.beforeSpecialized.session0Count++;
+        } else if (session === "" || session === null) {
+            report.beforeSpecialized.emptySessionCount++;
+        } else {
+            report.beforeSpecialized.bySession[session] =
+                (report.beforeSpecialized.bySession[session] || 0) + 1;
+        }
+    });
+
+    // 專業科目分配後
+    ctx = pipeline_scheduleSpecializedSubjects(ctx);
+    ctx.students.forEach(function (student) {
+        const session = student[ctx.columns.session];
+        if (session === 0 || session === "" || session === null) {
+            report.afterSpecialized.session0Count++;
+        } else {
+            report.afterSpecialized.bySession[session] =
+                (report.afterSpecialized.bySession[session] || 0) + 1;
+        }
+    });
+
+    // 試場分配後
+    ctx = pipeline_assignRooms(ctx);
+    ctx.students.forEach(function (student) {
+        const session = student[ctx.columns.session];
+        const room = student[ctx.columns.room];
+        if (room === 0) {
+            report.afterRoomAssign.room0Students.push({
+                class: student[ctx.columns.class],
+                name: student[ctx.columns.name],
+                subject: student[ctx.columns.subject],
+                session: session,
+                sessionType: typeof session,
+            });
+        } else {
+            const key = "session" + session;
+            report.afterRoomAssign.bySession[key] =
+                (report.afterRoomAssign.bySession[key] || 0) + 1;
+        }
+    });
+
+    Logger.log(JSON.stringify(report, null, 2));
+    return report;
+}
+
+/**
  * 建立測試資料快照
  */
 function createDataSnapshot() {

@@ -103,7 +103,9 @@ function createProctorRecordSheet() {
     const studentNumberIndex = headerRow.indexOf("學號");
     const studentNameIndex = headerRow.indexOf("姓名");
     const subjectIndex = headerRow.indexOf("科目名稱");
-    const classPopulationIndex = headerRow.indexOf("班級人數");
+    // A 表「班級人數」欄位應為「同節次、同試場、同班級、同科目」的人數
+    // 這與小袋的定義相同，所以使用小袋人數
+    const smallBagPopulationIndex = headerRow.indexOf("小袋人數");
 
     RECORD_OUTPUT_SHEET.clear();
     if (RECORD_OUTPUT_SHEET.getMaxRows() > 5) {
@@ -155,7 +157,7 @@ function createProctorRecordSheet() {
             examineeRow[studentNumberIndex],
             examineeRow[studentNameIndex],
             examineeRow[subjectIndex],
-            examineeRow[classPopulationIndex],
+            examineeRow[smallBagPopulationIndex],
             "",
             "",
             "",
