@@ -221,7 +221,11 @@ function createExamFromSheet() {
         // 有效節次編號的學生放入對應的 session
         if (sessionNumber >= 0 && sessionNumber < exam.sessions.length) {
             exam.sessions[sessionNumber].addStudent(studentRow);
-        } else if (sessionNumber === "" || sessionNumber === null || sessionNumber === undefined) {
+        } else if (
+            sessionNumber === "" ||
+            sessionNumber === null ||
+            sessionNumber === undefined
+        ) {
             exam.sessions[0].addStudent(studentRow);
         }
     });
@@ -262,7 +266,7 @@ function saveExamToSheet(exam) {
     // 若 Classroom 為空，則從 Session 收集（尚未分配試場的學生）
     exam.sessions.forEach((session) => {
         let sessionHasClassroomStudents = false;
-        
+
         // 先檢查 classroom 是否有學生
         session.classrooms.forEach((classroom) => {
             if (classroom.students && classroom.students.length > 0) {
@@ -270,9 +274,13 @@ function saveExamToSheet(exam) {
                 sessionHasClassroomStudents = true;
             }
         });
-        
+
         // 如果 classroom 沒有學生，則從 session.students 收集
-        if (!sessionHasClassroomStudents && session.students && session.students.length > 0) {
+        if (
+            !sessionHasClassroomStudents &&
+            session.students &&
+            session.students.length > 0
+        ) {
             allStudents.push(...session.students);
         }
     });

@@ -6,7 +6,7 @@ function onOpen() {
         .addSeparator()
         .addItem(
             "步驟 1. 產出公告用補考名單、試場記錄表",
-            "runFullSchedulingPipeline"
+            "pipeline_executeFullScheduling"
         )
         .addItem("步驟 2. 合併列印小袋封面(要很久哦)", "mergeSmallBagPdfFiles")
         .addItem(
@@ -17,7 +17,7 @@ function onOpen() {
         .addSeparator()
         .addItem(
             "手動調整試場之後，繼續進行到試場紀錄表",
-            "resumePipelineAfterManualAdjustments"
+            "pipeline_executePostAdjustment"
         )
         .addSeparator()
         .addItem("依「科目」排序補考名單", "sortFilteredStudentsBySubject")
@@ -30,26 +30,50 @@ function onOpen() {
             "sortFilteredStudentsBySessionRoom"
         )
         .addSeparator()
-        .addItem("步驟 1-1. 清空", "resetFilteredSheets")
-        .addItem("步驟 1-2. 開始篩選", "buildFilteredCandidateList")
-        .addItem("步驟 1-3. 安排共同科節次", "scheduleCommonSubjectSessions")
-        .addItem(
-            "步驟 1-4. 安排專業科節次",
-            "scheduleSpecializedSubjectSessions"
+        .addSubMenu(
+            SpreadsheetApp.getUi()
+                .createMenu("Pipeline 模式（高效能）")
+                .addItem("完整排程", "pipeline_executeFullScheduling")
+                .addItem("手動調整後繼續", "pipeline_executePostAdjustment")
+                .addItem("只分配節次", "pipeline_executeSessionScheduling")
+                .addItem("只分配試場", "pipeline_executeRoomAssignment")
         )
-        .addItem("步驟 1-5. 安排試場", "assignExamRooms")
-        .addItem("步驟 1-6. 計算大、小袋編號", "allocateBagIdentifiers")
-        .addItem("步驟 1-7. 填入試場時間", "populateSessionTimes")
-        .addItem("步驟 1-8. 計算試場人數", "updateBagAndClassPopulations")
-        .addItem("步驟 1-9. 產生「公告版補考場次」", "createExamBulletinSheet")
-        .addItem("步驟 1-10. 產生「試場記錄表」", "createProctorRecordSheet")
-        .addItem(
-            "步驟 1-11. 產生「小袋封面套印用資料」",
-            "composeSmallBagDataset"
-        )
-        .addItem(
-            "步驟 1-12. 產生「大袋封面套印用資料」",
-            "composeBigBagDataset"
+        .addSubMenu(
+            SpreadsheetApp.getUi()
+                .createMenu("單步驟模式（除錯用）")
+                .addItem("步驟 1-1. 清空", "resetFilteredSheets")
+                .addItem("步驟 1-2. 開始篩選", "buildFilteredCandidateList")
+                .addItem(
+                    "步驟 1-3. 安排共同科節次",
+                    "scheduleCommonSubjectSessions"
+                )
+                .addItem(
+                    "步驟 1-4. 安排專業科節次",
+                    "scheduleSpecializedSubjectSessions"
+                )
+                .addItem("步驟 1-5. 安排試場", "assignExamRooms")
+                .addItem("步驟 1-6. 計算大、小袋編號", "allocateBagIdentifiers")
+                .addItem("步驟 1-7. 填入試場時間", "populateSessionTimes")
+                .addItem(
+                    "步驟 1-8. 計算試場人數",
+                    "updateBagAndClassPopulations"
+                )
+                .addItem(
+                    "步驟 1-9. 產生「公告版補考場次」",
+                    "createExamBulletinSheet"
+                )
+                .addItem(
+                    "步驟 1-10. 產生「試場記錄表」",
+                    "createProctorRecordSheet"
+                )
+                .addItem(
+                    "步驟 1-11. 產生「小袋封面套印用資料」",
+                    "composeSmallBagDataset"
+                )
+                .addItem(
+                    "步驟 1-12. 產生「大袋封面套印用資料」",
+                    "composeBigBagDataset"
+                )
         )
         .addItem("步驟 2. 合併列印小袋封面(要很久哦)", "mergeSmallBagPdfFiles")
         .addItem("步驟 3. 合併列印大袋封面", "mergeBigBagPdfFiles")
