@@ -226,24 +226,35 @@ function pipeline_scheduleSpecializedSubjects(ctx) {
         }
     }
 
-    // ===== 步驟 4: 檢查未分配 =====
+    // ===== 步驟 4: 檢查未分配並收集詳細資訊 =====
     let unscheduledCount = 0;
+    const unscheduledDetails = {}; // "班級+科目" -> 人數
+
     for (let i = 0; i < students.length; i++) {
-        const session = students[i][columns.session];
+        const student = students[i];
+        const session = student[columns.session];
         if (session === 0 || session === "") {
             unscheduledCount++;
+            const key = student[columns.class] + " " + student[columns.subject];
+            unscheduledDetails[key] = (unscheduledDetails[key] || 0) + 1;
         }
     }
 
     if (unscheduledCount > 0) {
+        // 組合詳細訊息
+        const detailList = Object.entries(unscheduledDetails)
+            .map(function (entry) {
+                return entry[0] + "(" + entry[1] + "人)";
+            })
+            .join("、");
+
         ctx.warnings.push(
-            "無法將所有人排入 " +
-                maxSessionCount +
-                " 節，請檢查是否有某科年級須補考過多科目！"
+            "以下班級科目無法排入節次：\n" + detailList
         );
     }
 
     ctx.stats.unscheduledCount = unscheduledCount;
+    ctx.stats.unscheduledSessionDetails = unscheduledDetails;
     return ctx;
 }
 
@@ -384,10 +395,36 @@ function pipeline_assignRooms(ctx) {
         }
     }
 
+    // ===== 步驟 3: 收集未分配試場的詳細資訊 =====
     if (!allScheduled) {
-        ctx.warnings.push(
-            "現有試場數無法容納所有補考學生，請增加試場數或調整每間試場人數上限！"
-        );
+        const unscheduledRoomDetails = {}; // "班級+科目" -> 人數
+
+        for (let i = 0; i < students.length; i++) {
+            const student = students[i];
+            // 只檢查已有節次但沒有試場的學生
+            const session = student[columns.session];
+            const room = student[columns.room];
+            if (session > 0 && (room === 0 || room === "")) {
+                const key = student[columns.class] + " " + student[columns.subject];
+                unscheduledRoomDetails[key] = (unscheduledRoomDetails[key] || 0) + 1;
+            }
+        }
+
+        if (Object.keys(unscheduledRoomDetails).length > 0) {
+            const detailList = Object.entries(unscheduledRoomDetails)
+                .map(function (entry) {
+                    return entry[0] + "(" + entry[1] + "人)";
+                })
+                .join("、");
+
+            ctx.warnings.push(
+                "以下班級科目無法排入試場：\n" + detailList
+            );
+        } else {
+            ctx.warnings.push(
+                "現有試場數無法容納所有補考學生，請增加試場數或調整每間試場人數上限！"
+            );
+        }
     }
 
     // 檢查第 9 節
