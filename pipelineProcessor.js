@@ -91,19 +91,28 @@ function pipeline_saveData(ctx) {
  * @returns {Object} 更新後的上下文
  */
 function pipeline_scheduleCommonSubjects(ctx) {
-    ctx.students.forEach(function (student) {
-        const subjectName = student[ctx.columns.subject];
-        const preferredSession = ctx.sessionRules[subjectName];
+    const columns = ctx.columns;
+    const sessionRules = ctx.sessionRules;
+
+    for (let i = 0; i < ctx.students.length; i++) {
+        const student = ctx.students[i];
+        const subjectName = student[columns.subject];
+        const preferredSession = sessionRules[subjectName];
         if (preferredSession != null) {
-            student[ctx.columns.session] = preferredSession;
+            student[columns.session] = preferredSession;
         }
-    });
+    }
 
     return ctx;
 }
 
 /**
- * 安排專業科目節次
+ * 安排專業科目節次（優化版：使用預建索引）
+ *
+ * 優化重點：
+ * 1. 預先建立「科別+年級+科目 → 學生索引陣列」的對映
+ * 2. 分配時直接透過索引存取，避免遍歷整個學生陣列
+ * 3. 時間複雜度從 O(n × m) 降為 O(n + m)
  *
  * @param {Object} ctx - Pipeline 上下文
  * @returns {Object} 更新後的上下文
@@ -112,32 +121,51 @@ function pipeline_scheduleSpecializedSubjects(ctx) {
     const sessionCapacity = 0.9 * ctx.params.sessionCapacity;
     const maxSessionCount = ctx.params.maxSessionCount;
     const columns = ctx.columns;
+    const students = ctx.students;
 
-    // 只統計尚未分配節次的學生
+    // ===== 步驟 1: 預建索引（單次遍歷）=====
+    // studentIndicesByGroup: "科別+年級+科目" -> [學生在陣列中的索引]
+    const studentIndicesByGroup = {};
     const deptGradeSubjectCounts = {};
-    ctx.students.forEach(function (student) {
+
+    for (let i = 0; i < students.length; i++) {
+        const student = students[i];
+        // 只處理尚未分配節次的學生
         if (student[columns.session] !== 0 && student[columns.session] !== "") {
-            return;
+            continue;
         }
+
         const key =
             student[columns.department] +
             student[columns.grade] +
             "_" +
             student[columns.subject];
-        deptGradeSubjectCounts[key] = (deptGradeSubjectCounts[key] || 0) + 1;
-    });
 
+        // 建立索引對映
+        if (!studentIndicesByGroup[key]) {
+            studentIndicesByGroup[key] = [];
+        }
+        studentIndicesByGroup[key].push(i);
+
+        // 同時統計人數
+        deptGradeSubjectCounts[key] = (deptGradeSubjectCounts[key] || 0) + 1;
+    }
+
+    // 依人數排序（大群組優先）
     const sortedCounts = Object.entries(deptGradeSubjectCounts).sort(
         compareCountDescending
     );
 
-    // 節次統計
+    // ===== 步驟 2: 節次統計初始化 =====
     const sessionStats = {};
     for (let i = 1; i <= maxSessionCount; i++) {
         sessionStats[i] = { population: 0, deptGrade: {} };
     }
 
-    // 分配學生到節次
+    // 記錄已分配的群組
+    const assignedGroups = {};
+
+    // ===== 步驟 3: 分配學生到節次（使用索引直接存取）=====
     for (
         let sessionNumber = 1;
         sessionNumber <= maxSessionCount;
@@ -147,13 +175,19 @@ function pipeline_scheduleSpecializedSubjects(ctx) {
 
         for (let i = 0; i < sortedCounts.length; i++) {
             const [deptGradeSubjectKey, studentCount] = sortedCounts[i];
+
+            // 已分配過的群組跳過
+            if (assignedGroups[deptGradeSubjectKey]) {
+                continue;
+            }
+
             const deptGradeKey = deptGradeSubjectKey.substring(
                 0,
                 deptGradeSubjectKey.indexOf("_")
             );
 
-            // 檢查互斥規則
-            if (Object.keys(session.deptGrade).includes(deptGradeKey)) {
+            // 檢查互斥規則：同科別年級不能在同節有不同科目
+            if (session.deptGrade[deptGradeKey]) {
                 continue;
             }
 
@@ -162,32 +196,30 @@ function pipeline_scheduleSpecializedSubjects(ctx) {
                 continue;
             }
 
-            // 分配學生
-            ctx.students.forEach(function (student) {
-                const studentKey =
-                    student[columns.department] +
-                    student[columns.grade] +
-                    "_" +
-                    student[columns.subject];
-                const currentSession = student[columns.session];
-                if (
-                    studentKey === deptGradeSubjectKey &&
-                    (currentSession === 0 || currentSession === "")
-                ) {
-                    student[columns.session] = sessionNumber;
-                    session.population++;
-                    session.deptGrade[deptGradeKey] =
-                        (session.deptGrade[deptGradeKey] || 0) + 1;
-                }
-            });
+            // ===== 關鍵優化：透過索引直接存取學生 =====
+            const indices = studentIndicesByGroup[deptGradeSubjectKey];
+            for (let j = 0; j < indices.length; j++) {
+                students[indices[j]][columns.session] = sessionNumber;
+            }
+
+            // 更新統計
+            session.population += studentCount;
+            session.deptGrade[deptGradeKey] =
+                (session.deptGrade[deptGradeKey] || 0) + 1;
+
+            // 標記已分配
+            assignedGroups[deptGradeSubjectKey] = true;
         }
     }
 
-    // 檢查未分配
-    const unscheduledCount = ctx.students.filter(function (s) {
-        const session = s[columns.session];
-        return session === 0 || session === "";
-    }).length;
+    // ===== 步驟 4: 檢查未分配 =====
+    let unscheduledCount = 0;
+    for (let i = 0; i < students.length; i++) {
+        const session = students[i][columns.session];
+        if (session === 0 || session === "") {
+            unscheduledCount++;
+        }
+    }
 
     if (unscheduledCount > 0) {
         ctx.warnings.push(
@@ -202,7 +234,13 @@ function pipeline_scheduleSpecializedSubjects(ctx) {
 }
 
 /**
- * 安排試場
+ * 安排試場（優化版：使用預建索引）
+ *
+ * 優化重點：
+ * 1. 先依節次分組，避免每次迴圈都過濾整個學生陣列
+ * 2. 預建「班級+科目 → 學生索引陣列」的對映
+ * 3. 分配時直接透過索引存取，避免遍歷
+ * 4. 時間複雜度從 O(n × s × r) 降為 O(n + s × r)
  *
  * @param {Object} ctx - Pipeline 上下文
  * @returns {Object} 更新後的上下文
@@ -213,86 +251,103 @@ function pipeline_assignRooms(ctx) {
     const maxRoomCount = ctx.params.maxRoomCount;
     const maxStudentsPerRoom = ctx.params.maxStudentsPerRoom;
     const maxSubjectsPerRoom = ctx.params.maxSubjectsPerRoom;
+    const students = ctx.students;
 
-    // 重置所有試場
-    ctx.students.forEach(function (student) {
-        student[columns.room] = 0;
-    });
+    // ===== 步驟 1: 重置所有試場並建立節次索引 =====
+    // studentIndicesBySession: sessionNumber -> [學生索引陣列]
+    const studentIndicesBySession = {};
+
+    for (let i = 0; i < students.length; i++) {
+        students[i][columns.room] = 0;
+
+        const sessionNum = Number(students[i][columns.session]);
+        if (sessionNum > 0) {
+            if (!studentIndicesBySession[sessionNum]) {
+                studentIndicesBySession[sessionNum] = [];
+            }
+            studentIndicesBySession[sessionNum].push(i);
+        }
+    }
 
     let allScheduled = true;
 
+    // ===== 步驟 2: 逐節處理 =====
     for (
         let sessionNumber = 1;
         sessionNumber <= maxSessionCount;
         sessionNumber++
     ) {
-        // 取得本節次學生（使用 Number() 確保類型一致）
-        const sessionStudents = ctx.students.filter(function (s) {
-            return Number(s[columns.session]) === sessionNumber;
-        });
+        const sessionIndices = studentIndicesBySession[sessionNumber];
+        if (!sessionIndices || sessionIndices.length === 0) continue;
 
-        if (sessionStudents.length === 0) continue;
+        // ===== 步驟 2a: 建立該節次的「班級+科目 → 索引」對映 =====
+        const indicesByClassSubject = {};
+        const classSubjectCounts = {};
 
-        // 計算班級科目統計
-        const deptClassSubjectCounts = {};
-        sessionStudents.forEach(function (student) {
+        for (let i = 0; i < sessionIndices.length; i++) {
+            const studentIdx = sessionIndices[i];
+            const student = students[studentIdx];
             const key = student[columns.class] + student[columns.subject];
-            deptClassSubjectCounts[key] =
-                (deptClassSubjectCounts[key] || 0) + 1;
-        });
 
-        const sortedCounts = Object.entries(deptClassSubjectCounts).sort(
+            if (!indicesByClassSubject[key]) {
+                indicesByClassSubject[key] = [];
+            }
+            indicesByClassSubject[key].push(studentIdx);
+            classSubjectCounts[key] = (classSubjectCounts[key] || 0) + 1;
+        }
+
+        // 依人數排序（大群組優先）
+        const sortedCounts = Object.entries(classSubjectCounts).sort(
             compareCountDescending
         );
 
-        // 試場統計
+        // ===== 步驟 2b: 試場統計初始化 =====
         const roomStats = {};
         for (let r = 1; r <= maxRoomCount; r++) {
-            roomStats[r] = { population: 0, classSubject: {} };
+            roomStats[r] = { population: 0, subjectCount: 0 };
         }
 
+        // 記錄已分配的群組
+        const assignedGroups = {};
+
+        // ===== 步驟 2c: 分配到試場 =====
         for (let roomNumber = 1; roomNumber <= maxRoomCount; roomNumber++) {
             const room = roomStats[roomNumber];
-            const scheduledKeys = [];
 
             for (let i = 0; i < sortedCounts.length; i++) {
                 const [classSubjectKey, count] = sortedCounts[i];
 
-                if (scheduledKeys.includes(classSubjectKey)) continue;
+                // 已分配過的群組跳過
+                if (assignedGroups[classSubjectKey]) continue;
+
+                // 檢查人數限制
                 if (count + room.population > maxStudentsPerRoom) continue;
-                if (
-                    Object.keys(room.classSubject).length + 1 >
-                    maxSubjectsPerRoom
-                )
-                    continue;
 
-                // 分配學生
-                ctx.students.forEach(function (student) {
-                    if (Number(student[columns.session]) !== sessionNumber)
-                        return;
-                    const studentKey =
-                        student[columns.class] + student[columns.subject];
-                    if (
-                        studentKey === classSubjectKey &&
-                        student[columns.room] === 0
-                    ) {
-                        student[columns.room] = roomNumber;
-                        room.population++;
-                        room.classSubject[classSubjectKey] =
-                            (room.classSubject[classSubjectKey] || 0) + 1;
-                    }
-                });
+                // 檢查科目數限制
+                if (room.subjectCount + 1 > maxSubjectsPerRoom) continue;
 
-                scheduledKeys.push(classSubjectKey);
+                // ===== 關鍵優化：透過索引直接存取學生 =====
+                const indices = indicesByClassSubject[classSubjectKey];
+                for (let j = 0; j < indices.length; j++) {
+                    students[indices[j]][columns.room] = roomNumber;
+                }
+
+                // 更新統計
+                room.population += count;
+                room.subjectCount++;
+
+                // 標記已分配
+                assignedGroups[classSubjectKey] = true;
             }
         }
 
-        // 檢查未分配
-        sessionStudents.forEach(function (student) {
-            if (student[columns.room] === 0) {
+        // ===== 步驟 2d: 檢查本節未分配 =====
+        for (let i = 0; i < sessionIndices.length; i++) {
+            if (students[sessionIndices[i]][columns.room] === 0) {
                 allScheduled = false;
+                break;
             }
-        });
+        }
     }
 
     if (!allScheduled) {
@@ -302,9 +357,9 @@ function pipeline_assignRooms(ctx) {
     }
 
     // 檢查第 9 節
-    const hasSession9 = ctx.students.some(function (s) {
-        return Number(s[columns.session]) === 9;
-    });
+    const hasSession9 =
+        studentIndicesBySession[9] && studentIndicesBySession[9].length > 0;
+
     if (hasSession9) {
         ctx.warnings.push(
             "部分考生被安排在第9節補考，請注意是否需要調整到中午應試！"
