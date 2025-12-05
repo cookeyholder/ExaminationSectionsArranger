@@ -234,13 +234,14 @@ function pipeline_scheduleSpecializedSubjects(ctx) {
 }
 
 /**
- * 安排試場（優化版：使用預建索引）
+ * 安排試場（優化版：使用預建索引 + 最佳適配策略）
  *
  * 優化重點：
  * 1. 先依節次分組，避免每次迴圈都過濾整個學生陣列
  * 2. 預建「班級+科目 → 學生索引陣列」的對映
  * 3. 分配時直接透過索引存取，避免遍歷
- * 4. 時間複雜度從 O(n × s × r) 降為 O(n + s × r)
+ * 4. 採用「最佳適配」策略：為每個群組找最適合的試場
+ * 5. 時間複雜度從 O(n × s × r) 降為 O(n + s × r)
  *
  * @param {Object} ctx - Pipeline 上下文
  * @returns {Object} 更新後的上下文
@@ -304,40 +305,54 @@ function pipeline_assignRooms(ctx) {
         // ===== 步驟 2b: 試場統計初始化 =====
         const roomStats = {};
         for (let r = 1; r <= maxRoomCount; r++) {
-            roomStats[r] = { population: 0, subjectCount: 0 };
+            // subjects: 該試場中的科目集合（用於正確計算科目數）
+            roomStats[r] = { population: 0, subjects: {} };
         }
 
-        // 記錄已分配的群組
-        const assignedGroups = {};
+        // ===== 步驟 2c: 採用「最佳適配」策略分配到試場 =====
+        // 對每個群組，找出最適合的試場（剩餘空間最小但足夠容納的試場）
+        for (let i = 0; i < sortedCounts.length; i++) {
+            const [classSubjectKey, count] = sortedCounts[i];
 
-        // ===== 步驟 2c: 分配到試場 =====
-        for (let roomNumber = 1; roomNumber <= maxRoomCount; roomNumber++) {
-            const room = roomStats[roomNumber];
+            // 從 classSubjectKey 中提取科目名稱
+            // classSubjectKey 格式為「班級 + 科目」，需要找到科目部分
+            // 先從 indicesByClassSubject 中取一個學生來獲取科目名稱
+            const sampleStudentIdx = indicesByClassSubject[classSubjectKey][0];
+            const subjectName = students[sampleStudentIdx][columns.subject];
 
-            for (let i = 0; i < sortedCounts.length; i++) {
-                const [classSubjectKey, count] = sortedCounts[i];
+            // 找出最適合的試場
+            let bestRoom = -1;
+            let bestRemainingSpace = Infinity;
 
-                // 已分配過的群組跳過
-                if (assignedGroups[classSubjectKey]) continue;
+            for (let roomNumber = 1; roomNumber <= maxRoomCount; roomNumber++) {
+                const room = roomStats[roomNumber];
 
                 // 檢查人數限制
                 if (count + room.population > maxStudentsPerRoom) continue;
 
-                // 檢查科目數限制
-                if (room.subjectCount + 1 > maxSubjectsPerRoom) continue;
+                // 檢查科目數限制（只有新科目才需要檢查）
+                const currentSubjectCount = Object.keys(room.subjects).length;
+                const isNewSubject = !room.subjects[subjectName];
+                if (isNewSubject && currentSubjectCount + 1 > maxSubjectsPerRoom) continue;
 
-                // ===== 關鍵優化：透過索引直接存取學生 =====
+                // 計算剩餘空間，選擇剩餘空間最小的（最佳適配）
+                const remainingSpace = maxStudentsPerRoom - room.population - count;
+                if (remainingSpace < bestRemainingSpace) {
+                    bestRemainingSpace = remainingSpace;
+                    bestRoom = roomNumber;
+                }
+            }
+
+            // 如果找到適合的試場，進行分配
+            if (bestRoom > 0) {
                 const indices = indicesByClassSubject[classSubjectKey];
                 for (let j = 0; j < indices.length; j++) {
-                    students[indices[j]][columns.room] = roomNumber;
+                    students[indices[j]][columns.room] = bestRoom;
                 }
 
                 // 更新統計
-                room.population += count;
-                room.subjectCount++;
-
-                // 標記已分配
-                assignedGroups[classSubjectKey] = true;
+                roomStats[bestRoom].population += count;
+                roomStats[bestRoom].subjects[subjectName] = true;
             }
         }
 
