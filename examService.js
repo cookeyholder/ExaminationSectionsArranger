@@ -213,12 +213,16 @@ function createExamFromSheet() {
     const exam = createExamRecord(maxSessionCount, maxRoomCount);
 
     // 將學生填入對應節次
+    // 注意：節次為 0 的學生表示尚未分配，應放入 sessions[0] 暫存
     candidateRows.forEach((studentRow) => {
         const sessionNumber = studentRow[columns.session];
 
-        // 只處理有效的節次編號
-        if (sessionNumber > 0 && sessionNumber < exam.sessions.length) {
+        // 節次 0 或空值的學生放入 sessions[0]（未分配）
+        // 有效節次編號的學生放入對應的 session
+        if (sessionNumber >= 0 && sessionNumber < exam.sessions.length) {
             exam.sessions[sessionNumber].addStudent(studentRow);
+        } else if (sessionNumber === "" || sessionNumber === null || sessionNumber === undefined) {
+            exam.sessions[0].addStudent(studentRow);
         }
     });
 
@@ -253,13 +257,24 @@ function saveExamToSheet(exam) {
     ).getValues()[0];
     const allStudents = [];
 
-    // 從 Classroom 收集所有學生（Single Source of Truth）
+    // 收集所有學生資料
+    // 優先從 Classroom 收集（已分配試場的學生）
+    // 若 Classroom 為空，則從 Session 收集（尚未分配試場的學生）
     exam.sessions.forEach((session) => {
+        let sessionHasClassroomStudents = false;
+        
+        // 先檢查 classroom 是否有學生
         session.classrooms.forEach((classroom) => {
             if (classroom.students && classroom.students.length > 0) {
                 allStudents.push(...classroom.students);
+                sessionHasClassroomStudents = true;
             }
         });
+        
+        // 如果 classroom 沒有學生，則從 session.students 收集
+        if (!sessionHasClassroomStudents && session.students && session.students.length > 0) {
+            allStudents.push(...session.students);
+        }
     });
 
     // 清空舊資料（保留標題列）
