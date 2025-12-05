@@ -453,17 +453,21 @@ function scheduleSpecializedSubjectSessions() {
         fetchDepartmentGradeSubjectCounts()
     ).sort(compareCountDescending);
 
-    // 清空所有節次（重新分配）
+    // 先收集所有未分配節次的學生（session = 0），再清空所有節次
+    // 注意：必須在 clear() 之前收集，否則資料會遺失
+    const allStudents = [];
     exam.sessions.forEach(function (session) {
-        session.clear();
+        session.students.forEach(function (student) {
+            // 只收集尚未分配節次的學生（節次為 0）
+            if (student[columns.session] === 0) {
+                allStudents.push(student);
+            }
+        });
     });
 
-    // 收集所有未分配節次的學生
-    const allStudents = [];
-    exam.sessions[0].students.forEach(function (student) {
-        if (student[columns.session] === 0) {
-            allStudents.push(student);
-        }
+    // 清空所有節次（為重新分配做準備）
+    exam.sessions.forEach(function (session) {
+        session.clear();
     });
 
     // 為每個節次分配學生
