@@ -453,14 +453,17 @@ function scheduleSpecializedSubjectSessions() {
         fetchDepartmentGradeSubjectCounts()
     ).sort(compareCountDescending);
 
-    // 先收集所有未分配節次的學生（session = 0），再清空所有節次
-    // 注意：必須在 clear() 之前收集，否則資料會遺失
-    const allStudents = [];
+    // 收集所有學生，分成已分配和未分配兩組
+    // 已分配的學生（共同科目，session > 0）需要保留
+    // 未分配的學生（專業科目，session = 0）需要重新分配
+    const assignedStudents = [];
+    const unassignedStudents = [];
     exam.sessions.forEach(function (session) {
         session.students.forEach(function (student) {
-            // 只收集尚未分配節次的學生（節次為 0）
             if (student[columns.session] === 0) {
-                allStudents.push(student);
+                unassignedStudents.push(student);
+            } else {
+                assignedStudents.push(student);
             }
         });
     });
@@ -468,6 +471,14 @@ function scheduleSpecializedSubjectSessions() {
     // 清空所有節次（為重新分配做準備）
     exam.sessions.forEach(function (session) {
         session.clear();
+    });
+
+    // 先把已分配的學生（共同科目）放回對應節次
+    assignedStudents.forEach(function (student) {
+        const sessionNumber = student[columns.session];
+        if (sessionNumber > 0 && sessionNumber < exam.sessions.length) {
+            exam.sessions[sessionNumber].addStudent(student);
+        }
     });
 
     // 為每個節次分配學生
@@ -502,7 +513,7 @@ function scheduleSpecializedSubjectSessions() {
             }
 
             // 分配學生到此節次
-            allStudents.forEach(function (student) {
+            unassignedStudents.forEach(function (student) {
                 const studentKey =
                     student[columns.department] +
                     student[columns.grade] +
@@ -526,7 +537,7 @@ function scheduleSpecializedSubjectSessions() {
     }
 
     // 檢查是否所有學生都已分配
-    const unscheduledCount = allStudents.filter(function (s) {
+    const unscheduledCount = unassignedStudents.filter(function (s) {
         return s[columns.session] === 0;
     }).length;
 
