@@ -8,7 +8,130 @@
  * - 從工作表建立 Exam 物件（createExamFromSheet）
  * - 將 Exam 物件存回工作表（saveExamToSheet）
  * - 取得欄位索引對映（getColumnIndices）
+ * - 批次讀取所有資料（loadAllData）- 效能優化
+ * - 批次寫入所有資料（saveAllData）- 效能優化
  */
+
+// ============================================================================
+// 效能優化：批次 I/O 函式
+// ============================================================================
+
+/**
+ * 一次性讀取所有需要的資料
+ *
+ * 根據 Google Apps Script 最佳實務，將所有讀取操作集中執行，
+ * 減少對 Spreadsheet 服務的呼叫次數。
+ *
+ * @returns {Object} 包含所有資料的物件
+ * @property {Array<Array>} students - 學生資料（含標題列）
+ * @property {Array<Array>} parameters - 參數區資料
+ * @property {Array<Array>} sessionTimes - 節次時間資料
+ * @property {Array<Array>} sessionRules - 科目節次規則（E2:F22）
+ */
+function loadAllData() {
+    return {
+        students: FILTERED_RESULT_SHEET.getDataRange().getValues(),
+        parameters: PARAMETERS_SHEET.getRange("A1:F22").getValues(),
+        sessionTimes: SESSION_TIME_REFERENCE_SHEET.getDataRange().getValues(),
+        sessionRules: PARAMETERS_SHEET.getRange("E2:F22").getValues(),
+    };
+}
+
+/**
+ * 解析參數區資料
+ *
+ * @param {Array<Array>} paramData - 參數區原始資料
+ * @returns {Object} 解析後的參數物件
+ */
+function parseParameters(paramData) {
+    return {
+        maxSessionCount: paramData[4][1], // B5
+        maxRoomCount: paramData[5][1], // B6
+        maxStudentsPerRoom: paramData[6][1], // B7
+        maxSubjectsPerRoom: paramData[7][1], // B8
+        sessionCapacity: paramData[8][1], // B9
+    };
+}
+
+/**
+ * 解析科目節次規則
+ *
+ * @param {Array<Array>} ruleRows - 規則原始資料（E2:F22）
+ * @returns {Object} 科目到節次的對映
+ */
+function parseSessionRules(ruleRows) {
+    const rules = {};
+    ruleRows.forEach(function (row) {
+        if (row[0] && row[1]) {
+            rules[row[0]] = row[1];
+        }
+    });
+    return rules;
+}
+
+/**
+ * 從標題列建立欄位索引
+ *
+ * @param {Array} headerRow - 標題列陣列
+ * @returns {Object} 欄位名稱到索引的對映
+ */
+function buildColumnIndices(headerRow) {
+    return {
+        department: headerRow.indexOf("科別"),
+        grade: headerRow.indexOf("年級"),
+        classCode: headerRow.indexOf("班級代碼"),
+        class: headerRow.indexOf("班級"),
+        seatNumber: headerRow.indexOf("座號"),
+        studentId: headerRow.indexOf("學號"),
+        name: headerRow.indexOf("姓名"),
+        subject: headerRow.indexOf("科目名稱"),
+        session: headerRow.indexOf("節次"),
+        room: headerRow.indexOf("試場"),
+        smallBagId: headerRow.indexOf("小袋序號"),
+        smallBagPopulation: headerRow.indexOf("小袋人數"),
+        bigBagId: headerRow.indexOf("大袋序號"),
+        bigBagPopulation: headerRow.indexOf("大袋人數"),
+        classPopulation: headerRow.indexOf("班級人數"),
+        time: headerRow.indexOf("時間"),
+        computer: headerRow.indexOf("電腦"),
+        manual: headerRow.indexOf("人工"),
+        teacher: headerRow.indexOf("任課老師"),
+    };
+}
+
+/**
+ * 一次性寫回所有學生資料
+ *
+ * @param {Array<Array>} students - 學生資料陣列（不含標題列）
+ */
+function saveAllData(students) {
+    const lastColumn = FILTERED_RESULT_SHEET.getLastColumn();
+    const lastRow = FILTERED_RESULT_SHEET.getLastRow();
+
+    // 清空舊資料（保留標題列）
+    if (lastRow > 1) {
+        FILTERED_RESULT_SHEET.getRange(
+            2,
+            1,
+            lastRow - 1,
+            lastColumn
+        ).clearContent();
+    }
+
+    // 寫入新資料
+    if (students.length > 0) {
+        FILTERED_RESULT_SHEET.getRange(
+            2,
+            1,
+            students.length,
+            students[0].length
+        ).setValues(students);
+    }
+}
+
+// ============================================================================
+// 原有函式（向後相容）
+// ============================================================================
 
 /**
  * 取得欄位索引對映
@@ -51,27 +174,7 @@ function getColumnIndices() {
         lastColumn
     ).getValues()[0];
 
-    return {
-        department: headerRow.indexOf("科別"),
-        grade: headerRow.indexOf("年級"),
-        classCode: headerRow.indexOf("班級代碼"),
-        class: headerRow.indexOf("班級"),
-        seatNumber: headerRow.indexOf("座號"),
-        studentId: headerRow.indexOf("學號"),
-        name: headerRow.indexOf("姓名"),
-        subject: headerRow.indexOf("科目名稱"),
-        session: headerRow.indexOf("節次"),
-        room: headerRow.indexOf("試場"),
-        smallBagId: headerRow.indexOf("小袋序號"),
-        smallBagPopulation: headerRow.indexOf("小袋人數"),
-        bigBagId: headerRow.indexOf("大袋序號"),
-        bigBagPopulation: headerRow.indexOf("大袋人數"),
-        classPopulation: headerRow.indexOf("班級人數"),
-        time: headerRow.indexOf("時間"),
-        computer: headerRow.indexOf("電腦"),
-        manual: headerRow.indexOf("人工"),
-        teacher: headerRow.indexOf("任課老師"),
-    };
+    return buildColumnIndices(headerRow);
 }
 
 /**

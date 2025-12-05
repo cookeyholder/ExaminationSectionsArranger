@@ -1,0 +1,36 @@
+{
+  "name": "examination-sections-arranger",
+  "version": "1.0.0",
+  "description": "Google Apps Script 補考試場編排系統",
+  "scripts": {
+    "push": "clasp push",
+    "pull": "clasp pull",
+    "deploy": "clasp push && clasp deploy",
+    "open": "clasp open",
+    "logs": "clasp logs",
+    "watch": "clasp push --watch",
+    "test": "echo '請在 GAS 編輯器中執行 runAllTests() 函式'",
+    "quick-test": "echo '請在 GAS 編輯器中執行 quickTest() 函式'",
+    "debug": "echo '請開啟 Web App 進行除錯: clasp open --webapp'",
+    "status": "clasp version && clasp deployments",
+    "create-version": "clasp version '新版本發布'",
+    "open-webapp": "clasp open --webapp",
+    "open-sheet": "echo '請手動開啟試算表'",
+    "lint": "echo 'GAS 專案暫無 linter 設定'"
+  },
+  "keywords": [
+    "google-apps-script",
+    "gas",
+    "examination",
+    "scheduling",
+    "classroom-management"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@google/clasp": "^2.4.2"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

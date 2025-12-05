@@ -78,3 +78,27 @@
 
 ### Rollback Plan
 保留 `master` 分支穩定版本，重構在 `refactor/domain-models` 分支進行。若發現問題可立即切回 master。
+
+---
+
+## 優化評估摘要（2025-12-05 新增）
+
+> 詳見 [OPTIMIZATION_REVIEW.md](OPTIMIZATION_REVIEW.md)
+
+### 已識別的問題
+
+1. **I/O 效率低落**：每個函式各自讀寫工作表，Pipeline 執行時 6+ 次 I/O
+2. **過度設計**：`createStatisticsContainer()` 約 80 行，多數功能未使用
+3. **資料來源不一致**：`session.students` vs `classroom.students`
+
+### 建議的優化方向
+
+| 目前設計            | 建議改為           | 效益             |
+| ------------------- | ------------------ | ---------------- |
+| 每函式各自 I/O      | 單次讀取-處理-寫回 | 執行時間減少 50% |
+| 通用統計建構器      | 直接 getter 定義   | 程式碼減少 80 行 |
+| session + classroom | 統一資料來源       | 簡化資料流       |
+
+### 總評
+
+重構方向（統一領域模型）正確，但實作方式過度設計。建議保留三層結構概念，但簡化實作並改為 Pipeline 模式。

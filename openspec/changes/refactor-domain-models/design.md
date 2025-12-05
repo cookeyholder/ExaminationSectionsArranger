@@ -1,5 +1,8 @@
 # 設計文件：領域模型重構
 
+> **文件更新日期**：2025-12-05  
+> **關鍵參考**：[OPTIMIZATION_REVIEW.md](OPTIMIZATION_REVIEW.md) - GAS 效能最佳化完整指南
+
 ## Context
 
 現有排程系統使用手動建立的物件（`createEmptySessionRecord()` 和 `createEmptyClassroomRecord()`），每個物件都有自己的統計 getter，導致程式碼重複、難以維護和擴充。
@@ -9,6 +12,7 @@
 - 新增統計維度需要修改多處
 - Session 和 Classroom 結構相似但實作獨立
 - 缺乏 Exam 層級的統計能力
+- ⚠️ **新發現**：I/O 效率問題（每個函式獨立讀寫工作表）
 
 **利害關係人**：
 - 開發者：需要維護和擴充系統
@@ -21,10 +25,11 @@
 2. **三層架構**：實作 Exam → Session → Classroom 階層結構
 3. **服務層抽象**：封裝 Exam 物件的建立、載入與儲存邏輯
 4. **保持功能一致**：重構後的輸出結果與現有系統完全相同
+5. **🚀 效能最佳化（新增）**：採用「單次讀取-Pipeline處理-單次寫入」模式
 
 ### Non-Goals
 - ❌ 改變業務規則（科別年級互斥、容量限制等）
-- ❌ 優化執行效能（目前未遇到效能瓶頸）
+- ~~❌ 優化執行效能（目前未遇到效能瓶頸）~~ → ✅ **已修改為目標**
 - ❌ 建立自動化測試框架（仍採用手動測試）
 - ❌ 向後相容舊的 API（完全重寫，不保留相容層）
 
@@ -94,11 +99,69 @@ getColumnIndices()        // 取得欄位索引對映
 3. 重寫輔助函式（同上）
 4. 重寫排序函式（同上）
 5. 移除舊函式（破壞性變更）
+5.5 **效能優化（新增）**：轉換為純函式架構
 6. 整合測試
+
+### 🚀 Decision 5: 採用「單次讀取-Pipeline處理-單次寫入」模式（新增）
+
+> 詳見 [OPTIMIZATION_REVIEW.md](OPTIMIZATION_REVIEW.md)
+
+**Why**：根據 Google Apps Script 官方 Best Practices，最小化對外部服務的呼叫可大幅提升效能
+
+**Google 官方建議**：
+> "Using JavaScript operations within your script is considerably faster than calling other services."
+> "Read all data into an array with one command, perform any operations on the data in the array, and write the data out with one command."
+
+**Implementation**：
+```javascript
+function runFullSchedulingPipeline() {
+  // 1. 一次性讀取
+  const rawData = loadAllData();
+  const students = rawData.students.slice(1);
+  const params = parseParameters(rawData.parameters);
+  const columns = buildColumnIndices(headerRow);
+  
+  // 2. Pipeline 處理（純函式，零 I/O）
+  scheduleCommonSubjectsInternal(students, params.sessionRules, columns);
+  scheduleSpecializedSubjectsInternal(students, params, columns);
+  assignRoomsInternal(students, params, columns);
+  // ... 更多純函式 ...
+  
+  // 3. 一次性寫回
+  saveAllData(students);
+}
+```
+
+**效能對比**：
+| 指標         | 優化前 | 優化後  |
+| ------------ | ------ | ------- |
+| I/O 次數     | 16-20  | 2-4     |
+| 預估執行時間 | 基準   | -60~70% |
 
 ## Architecture
 
-### 資料流向
+### 🚀 最佳化後的資料流向（推薦）
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    runFullSchedulingPipeline()                       │
+├─────────────────────────────────────────────────────────────────────┤
+│  1. 讀取階段（一次性）                                               │
+│     └── loadAllData() → { students, parameters, sessionTimes }      │
+├─────────────────────────────────────────────────────────────────────┤
+│  2. 處理階段（純 JavaScript，無 I/O）                               │
+│     ├── scheduleCommonSubjectsInternal(data, rules)                 │
+│     ├── scheduleSpecializedSubjectsInternal(data, config)           │
+│     ├── assignRoomsInternal(data, config)                           │
+│     ├── sortStudentsInternal(data)                                  │
+│     └── calculatePopulationsInternal(data)                          │
+├─────────────────────────────────────────────────────────────────────┤
+│  3. 寫入階段（一次性）                                               │
+│     └── saveAllData(students)                                       │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### 原本設計的資料流向（已實作）
 
 ```
 ┌─────────────────┐
@@ -202,13 +265,16 @@ student[columns.subject]  // 取代 student[7]
 
 ### Risk 2: 效能下降
 
-**Likelihood**: 低
+**Likelihood**: ~~低~~ → **高（已識別）**
 **Impact**: 中
+
+**已識別問題**：目前實作每個排程函式都獨立呼叫 `createExamFromSheet()` 和 `saveExamToSheet()`，造成 16-20 次 I/O 操作。
 
 **Mitigation**：
 - 記錄重構前的執行時間
 - 監控每階段的執行時間變化
-- 若 getter 屬性造成效能問題，改為快取結果
+- ~~若 getter 屬性造成效能問題，改為快取結果~~
+- **🚀 建議**：實作「單次讀取-Pipeline處理-單次寫入」模式（詳見階段 5.5）
 
 **Trade-off**：動態統計 vs 預計算
 - 選擇：動態統計（每次存取時計算）
@@ -283,7 +349,109 @@ clasp push
 ✅ 所有現有功能正常運作
 ✅ 輸出結果與重構前完全一致
 ✅ 無新增錯誤或警告
-✅ 執行時間差異在 ±10% 內
+~~✅ 執行時間差異在 ±10% 內~~
+🚀 **更新**：執行時間減少 30% 以上（採用效能優化後）
 ✅ 舊函式已完全移除
 ✅ 程式碼通過 `clasp push` 檢查
 ✅ 文件已更新（AGENTS.md）
+
+---
+
+## 🚀 效能優化評估（2025-12-05 新增）
+
+> **完整評估與實作指南請見 [OPTIMIZATION_REVIEW.md](OPTIMIZATION_REVIEW.md)**
+
+### 已識別的過度設計問題
+
+經過深入檢視，發現目前的實作存在以下問題：
+
+#### 1. I/O 效率問題（嚴重）🔥
+
+**根本原因**：違反 Google Apps Script 最佳實務
+
+> **Google 官方建議**：
+> - "Minimize calls to other services"
+> - "Read all data into an array, perform operations, write data out with one command"
+> - "Alternating read and write commands is slow"
+
+**現況**：每個排程函式都獨立執行 `createExamFromSheet()` 和 `saveExamToSheet()`
+```javascript
+// 目前設計 - 每個函式各自讀寫
+scheduleCommonSubjectSessions()       // 讀取 → 處理 → 寫回
+scheduleSpecializedSubjectSessions()  // 讀取 → 處理 → 寫回
+assignExamRooms()                     // 讀取 → 處理 → 寫回
+```
+
+**問題**：Pipeline 執行時會有 16-20 次工作表讀寫
+
+**解決方案**：改為 Pipeline 模式（詳見 tasks.md 階段 5.5）
+```javascript
+// 優化設計 - 單次讀寫
+function runFullSchedulingPipeline() {
+  const data = loadAllData();                    // 只讀一次
+  scheduleCommonSubjectsInternal(data, rules);   // 純函式
+  scheduleSpecializedSubjectsInternal(data, config);
+  assignRoomsInternal(data, config);
+  // ...
+  saveAllData(data);                             // 只寫一次
+}
+```
+
+#### 2. 過度抽象的統計容器
+
+**現況**：`createStatisticsContainer()` 約 80 行，提供通用的統計機制
+
+**問題**：
+- `statistics(dimensionName)` 只在內部使用
+- `getAvailableStatistics()` 從未使用
+- `distributeToChildren()` 設計了但未充分利用
+
+**建議**：簡化為直接的 getter 定義
+```javascript
+// 原本 - 通用建構器
+function createStatisticsContainer(config) { /* 80行 */ }
+
+// 建議 - 直接定義
+function createSessionRecord() {
+  return {
+    students: [],
+    get departmentGradeStatistics() {
+      const stats = {};
+      this.students.forEach(s => {
+        const key = s[0] + s[1];
+        stats[key] = (stats[key] || 0) + 1;
+      });
+      return stats;
+    }
+  };
+}
+```
+
+#### 3. 資料來源不一致
+
+**現況**：
+- 排程函式操作 `session.students`
+- `saveExamToSheet()` 從 `classroom.students` 收集
+
+**問題**：需要在適當時機執行 `distributeToChildren()` 同步資料，容易出錯
+
+**建議**：
+- 選項 A：統一從 `session.students` 收集（簡單）
+- 選項 B：移除 `classroom.students`，Classroom 只保留統計功能
+
+### 建議的優化方向
+
+| 項目     | 目前                | 建議               | 效益                    |
+| -------- | ------------------- | ------------------ | ----------------------- |
+| I/O 模式 | 每函式各自讀寫      | 單次讀取-處理-寫回 | **執行時間減少 60-70%** |
+| 統計容器 | 通用建構器          | 直接 getter        | 程式碼減少 80 行        |
+| 資料來源 | session + classroom | 只用 session       | 簡化資料流              |
+| 程式碼量 | ~1400 行            | ~1000 行           | 維護成本降低            |
+
+### 執行優先順序
+
+1. **🔥 最高優先**：實作 Pipeline 模式（解決 I/O 效率問題，詳見 tasks.md 階段 5.5）
+2. **中優先**：簡化統計容器（減少程式碼量）
+3. **低優先**：統一資料來源（需要更多測試）
+
+詳見 [OPTIMIZATION_REVIEW.md](OPTIMIZATION_REVIEW.md) 的完整分析、GAS 最佳實務和實作程式碼範例。

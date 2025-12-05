@@ -1,0 +1,236 @@
+/**
+ * 開發測試工具
+ * 提供本地開發、偵錯、測試輔助功能
+ */
+
+/**
+ * 建立測試資料快照（用於在瀏覽器中檢視）
+ * @returns {Object} 包含所有關鍵資料的 JSON 物件
+ */
+function createDataSnapshot() {
+    const exam = createExamFromSheet();
+
+    return {
+        timestamp: new Date().toISOString(),
+        exam: {
+            population: exam.population,
+            sessionCount: exam.sessions.filter((s) => s).length - 1,
+            statistics: {
+                sessions: exam.sessionDistribution,
+                departments: exam.departmentDistribution,
+                grades: exam.gradeDistribution,
+                subjects: exam.subjectDistribution,
+            },
+            sessions: exam.sessions.slice(1).map((session, idx) => ({
+                sessionNumber: idx + 1,
+                population: session.population,
+                classroomCount: session.classrooms.filter((c) => c).length - 1,
+                departmentGradeStats: session.departmentGradeStatistics,
+                classrooms: session.classrooms
+                    .slice(1)
+                    .map((classroom, cidx) => ({
+                        roomNumber: cidx + 1,
+                        population: classroom.population,
+                        classSubjectStats: classroom.classSubjectStatistics,
+                        students: classroom.students.slice(0, 5), // 只取前 5 筆範例
+                    })),
+            })),
+        },
+    };
+}
+
+/**
+ * 將資料快照輸出為 JSON 檔案（透過 Web App）
+ */
+function serveDataSnapshot() {
+    const snapshot = createDataSnapshot();
+    return ContentService.createTextOutput(
+        JSON.stringify(snapshot, null, 2)
+    ).setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * 建立簡易的 Web 介面用於檢視資料
+ */
+function doGet(e) {
+    var mode = e.parameter.mode || "viewer";
+
+    if (mode === "api") {
+        return serveDataSnapshot();
+    }
+
+    // 提供 HTML 檢視器
+    var html =
+        "<!DOCTYPE html>" +
+        "<html>" +
+        "<head>" +
+        '<meta charset="utf-8">' +
+        "<title>GAS 開發測試工具</title>" +
+        "<style>" +
+        "body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }" +
+        "h1 { color: #4ec9b0; }" +
+        "pre { background: #252526; padding: 15px; border-radius: 5px; overflow-x: auto; }" +
+        ".actions { margin: 20px 0; }" +
+        "button { background: #0e639c; color: white; border: none; padding: 10px 20px; margin-right: 10px; cursor: pointer; border-radius: 3px; }" +
+        "button:hover { background: #1177bb; }" +
+        ".stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0; }" +
+        ".stat-card { background: #252526; padding: 15px; border-radius: 5px; border-left: 3px solid #4ec9b0; }" +
+        ".stat-value { font-size: 32px; font-weight: bold; color: #4ec9b0; }" +
+        ".stat-label { font-size: 12px; color: #858585; margin-top: 5px; }" +
+        "</style>" +
+        "</head>" +
+        "<body>" +
+        "<h1>📊 GAS 開發測試工具</h1>" +
+        '<div class="actions">' +
+        '<button onclick="loadData()">🔄 重新載入資料</button>' +
+        '<button onclick="downloadJSON()">💾 下載 JSON</button>' +
+        '<button onclick="runTests()">🧪 執行測試</button>' +
+        "</div>" +
+        '<div class="stats" id="stats"></div>' +
+        "<h2>📋 資料快照</h2>" +
+        '<pre id="output">載入中...</pre>' +
+        "<script>" +
+        "var currentData = null;" +
+        "function loadData() {" +
+        '  fetch(window.location.href.split("?")[0] + "?mode=api")' +
+        "    .then(function(response) { return response.json(); })" +
+        "    .then(function(data) { currentData = data; displayData(data); })" +
+        '    .catch(function(error) { document.getElementById("output").textContent = "錯誤: " + error.message; });' +
+        "}" +
+        "function displayData(data) {" +
+        "  var statsHTML = " +
+        '    "<div class=\\"stat-card\\"><div class=\\"stat-value\\">" + data.exam.population + "</div><div class=\\"stat-label\\">總學生數</div></div>" +' +
+        '    "<div class=\\"stat-card\\"><div class=\\"stat-value\\">" + data.exam.sessionCount + "</div><div class=\\"stat-label\\">總節次數</div></div>" +' +
+        '    "<div class=\\"stat-card\\"><div class=\\"stat-value\\">" + Object.keys(data.exam.statistics.subjects).length + "</div><div class=\\"stat-label\\">科目數量</div></div>" +' +
+        '    "<div class=\\"stat-card\\"><div class=\\"stat-value\\">" + Object.keys(data.exam.statistics.departments).length + "</div><div class=\\"stat-label\\">科別數量</div></div>";' +
+        '  document.getElementById("stats").innerHTML = statsHTML;' +
+        '  document.getElementById("output").textContent = JSON.stringify(data, null, 2);' +
+        "}" +
+        "function downloadJSON() {" +
+        '  if (!currentData) return alert("請先載入資料");' +
+        '  var blob = new Blob([JSON.stringify(currentData, null, 2)], { type: "application/json" });' +
+        "  var url = URL.createObjectURL(blob);" +
+        '  var a = document.createElement("a");' +
+        "  a.href = url;" +
+        '  a.download = "exam-snapshot-" + new Date().toISOString() + ".json";' +
+        "  a.click();" +
+        "}" +
+        'function runTests() { alert("測試功能開發中..."); }' +
+        "loadData();" +
+        "</script>" +
+        "</body>" +
+        "</html>";
+
+    return HtmlService.createHtmlOutput(html).setTitle("GAS 開發工具");
+}
+
+/**
+ * 測試用：建立範例資料
+ */
+function createTestData() {
+    const testStudents = [
+        ["資訊", "一年級", "資一甲", "張三", "數學"],
+        ["資訊", "一年級", "資一甲", "李四", "英文"],
+        ["機械", "二年級", "機二乙", "王五", "數學"],
+        ["電機", "三年級", "電三丙", "趙六", "物理"],
+    ];
+
+    const sheet = EXAM_SESSIONS_SHEET;
+    const startRow = 2;
+
+    testStudents.forEach((student, idx) => {
+        sheet.getRange(startRow + idx, 1, 1, 5).setValues([student]);
+    });
+
+    Logger.log("測試資料建立完成");
+}
+
+/**
+ * 清除所有節次與試場資料（保留學生清單）
+ */
+function clearSchedulingData() {
+    const sheet = EXAM_SESSIONS_SHEET;
+    const lastRow = sheet.getLastRow();
+    const lastCol = sheet.getLastColumn();
+
+    // 清除第 6 欄（節次）之後的所有資料
+    if (lastCol > 5) {
+        sheet.getRange(2, 6, lastRow - 1, lastCol - 5).clearContent();
+    }
+
+    Logger.log("排程資料已清除");
+}
+
+/**
+ * 顯示當前 Exam 物件的除錯資訊
+ */
+function debugExamObject() {
+    const exam = createExamFromSheet();
+
+    Logger.log("=== Exam 物件除錯資訊 ===");
+    Logger.log("總人數: " + exam.population);
+    Logger.log("節次分布: " + JSON.stringify(exam.sessionDistribution));
+    Logger.log("科別分布: " + JSON.stringify(exam.departmentDistribution));
+    Logger.log("年級分布: " + JSON.stringify(exam.gradeDistribution));
+    Logger.log("科目分布: " + JSON.stringify(exam.subjectDistribution));
+
+    exam.sessions.slice(1).forEach((session, idx) => {
+        if (session && session.population > 0) {
+            Logger.log("\n節次 " + (idx + 1) + ":");
+            Logger.log("  人數: " + session.population);
+            Logger.log(
+                "  試場數: " + (session.classrooms.filter((c) => c).length - 1)
+            );
+            Logger.log(
+                "  科別-年級統計: " +
+                    JSON.stringify(session.departmentGradeStatistics)
+            );
+        }
+    });
+}
+
+/**
+ * 效能測試：測量函式執行時間
+ */
+function measurePerformance(functionName, ...args) {
+    const startTime = new Date().getTime();
+
+    try {
+        const result = this[functionName](...args);
+        const endTime = new Date().getTime();
+        const duration = endTime - startTime;
+
+        Logger.log(functionName + " 執行時間: " + duration + "ms");
+        return { result: result, duration: duration };
+    } catch (error) {
+        Logger.log(functionName + " 執行錯誤: " + error.message);
+        throw error;
+    }
+}
+
+/**
+ * 比較兩個 Exam 物件的差異
+ */
+function compareExamSnapshots(snapshot1, snapshot2) {
+    const differences = {
+        populationChanged:
+            snapshot1.exam.population !== snapshot2.exam.population,
+        sessionCountChanged:
+            snapshot1.exam.sessionCount !== snapshot2.exam.sessionCount,
+        statisticsChanges: {},
+    };
+
+    // 比較統計資料
+    ["sessions", "departments", "grades", "subjects"].forEach((key) => {
+        const stats1 = JSON.stringify(snapshot1.exam.statistics[key]);
+        const stats2 = JSON.stringify(snapshot2.exam.statistics[key]);
+        if (stats1 !== stats2) {
+            differences.statisticsChanges[key] = {
+                before: snapshot1.exam.statistics[key],
+                after: snapshot2.exam.statistics[key],
+            };
+        }
+    });
+
+    return differences;
+}
