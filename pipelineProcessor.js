@@ -757,9 +757,9 @@ function pipeline_executeRoomAssignment() {
  */
 function pipeline_sortByClassSeat(students, columns) {
     return students.slice().sort(function (a, b) {
-        // 學號第2-5碼（例如 "11301234" 取 "1301"）
-        const aStudentIdPart = String(a[columns.studentId]).substring(1, 5);
-        const bStudentIdPart = String(b[columns.studentId]).substring(1, 5);
+        // 學號第2-4碼（例如 "11301234" 取 "130"）
+        const aStudentIdPart = String(a[columns.studentId]).substring(1, 4);
+        const bStudentIdPart = String(b[columns.studentId]).substring(1, 4);
         if (aStudentIdPart !== bStudentIdPart)
             return aStudentIdPart.localeCompare(bStudentIdPart);
         // 年級
